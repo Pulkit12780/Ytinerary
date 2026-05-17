@@ -1,0 +1,3 @@
+- [User profile](user_role.md) — Product owner, Python/LLM background, building Ytinerary solo
+- [Ytinerary design system foundation](design-system-foundation.md) — Token conventions, palette rationale, key aesthetic decisions
+- [Component patterns established](component-patterns.md) — PlaceCard accordion, sidebar collapse rail, pin anatomy

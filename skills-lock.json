@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "cpo": {
+      "source": "pollow/c-suite-skills",
+      "sourceType": "github",
+      "skillPath": "skills/cpo/SKILL.md",
+      "computedHash": "23e56fb186c7a25e50f7d884358adaf95e178ac0f7fcf80b14326462987ce117"
+    },
+    "create-prd": {
+      "source": "phuryn/pm-skills",
+      "sourceType": "github",
+      "skillPath": "pm-execution/skills/create-prd/SKILL.md",
+      "computedHash": "5c242d3abb9508f59021ed22936230e555971feab690cbf2a90142e06d10e7ae"
+    },
+    "cto-advisor": {
+      "source": "shipshitdev/library",
+      "sourceType": "github",
+      "skillPath": "skills/cto-advisor/SKILL.md",
+      "computedHash": "65a2aff2f9122c9255b2f5c9fc48dee93861518247c3ef80f6e71683b7e40868"
+    },
+    "wireframe-prototyping": {
+      "source": "aj-geddes/useful-ai-prompts",
+      "sourceType": "github",
+      "skillPath": "skills/wireframe-prototyping/SKILL.md",
+      "computedHash": "ea93623ec13e0f9a2c395bb73b5f05979d9332ce72d4c7670ffcbff3964ebcdd"
+    }
+  }
+}
