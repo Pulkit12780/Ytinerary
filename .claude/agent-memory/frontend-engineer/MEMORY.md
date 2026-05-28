@@ -1,0 +1,1 @@
+- [Project: Ytinerary](project-ytinerary.md) — Core context: what the app is, what's built, design system tokens, class conventions, breakpoints, and backend stub details

@@ -19,6 +19,12 @@
       "skillPath": "skills/cto-advisor/SKILL.md",
       "computedHash": "65a2aff2f9122c9255b2f5c9fc48dee93861518247c3ef80f6e71683b7e40868"
     },
+    "micro-interactions": {
+      "source": "dylantarre/animation-principles",
+      "sourceType": "github",
+      "skillPath": "skills/01-by-domain/micro-interactions/SKILL.md",
+      "computedHash": "22a154d2e1a33e32f2946504502849dba5a934ac3654ba625a5807b836272955"
+    },
     "wireframe-prototyping": {
       "source": "aj-geddes/useful-ai-prompts",
       "sourceType": "github",

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 .claude/skills/ui-ux-pro-max/scripts/search.py \"travel itinerary SaaS premium modern dark hero landing page\" --design-system -p \"Ytinerary\")"
+    ]
+  }
+}

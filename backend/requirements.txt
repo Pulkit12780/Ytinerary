@@ -1,0 +1,12 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-dotenv>=1.0.0
+openai>=1.30.0
+youtube-transcript-api>=0.6.2
+yt-dlp>=2024.11.18
+scikit-learn>=1.5.2
+numpy>=1.26.4
+httpx>=0.28.0
+langgraph>=0.2.56
+langchain-core>=0.3.0
+pydantic>=2.9.0
