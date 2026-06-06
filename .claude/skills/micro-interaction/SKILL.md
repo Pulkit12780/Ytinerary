@@ -1,5 +1,5 @@
 ---
-name: micro-interactions
+name: micro-interaction
 description: Use when designing small UI feedback moments like button states, toggles, form validation, loading indicators, or notification badges.
 ---
 

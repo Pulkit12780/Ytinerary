@@ -262,7 +262,7 @@ def _build_response(state: PipelineState) -> PlanResponse:
                 hours=p.get("hours"),
                 description=p.get("description"),
                 photo_url=p.get("photo_url"),
-                foursquare_id=p.get("foursquare_id"),
+                place_id=p.get("place_id"),
                 source_videos=[
                     SourceVideo(url=sv["url"], title=sv["title"])
                     for sv in p.get("source_videos", [])

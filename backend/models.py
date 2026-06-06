@@ -41,7 +41,7 @@ class Place(BaseModel):
     hours: Optional[str] = None
     description: Optional[str] = None
     photo_url: Optional[str] = None
-    foursquare_id: Optional[str] = None
+    place_id: Optional[str] = None
     source_videos: list[SourceVideo] = []
 
 

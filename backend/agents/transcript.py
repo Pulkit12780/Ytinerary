@@ -19,19 +19,60 @@ def _extract_video_id(url: str) -> str | None:
 
 
 def _fetch_via_api(video_id: str) -> tuple[str, None] | tuple[None, str]:
-    """Returns (transcript_text, None) or (None, error_reason)."""
-    from youtube_transcript_api import (
-        YouTubeTranscriptApi,
+    """Returns (transcript_text, None) or (None, error_reason).
+
+    Priority:
+      1. English captions (manual or auto-generated)
+      2. Any other language translated to English
+      3. Any other language raw (GPT still extracts place names from Hindi etc.)
+    Uses youtube-transcript-api v1.x instance API.
+    """
+    from youtube_transcript_api import YouTubeTranscriptApi
+    from youtube_transcript_api._errors import (
         TranscriptsDisabled,
         NoTranscriptFound,
         VideoUnavailable,
     )
+
+    api = YouTubeTranscriptApi()
+
+    def _entries_to_text(fetched) -> str:
+        return " ".join(e["text"] for e in fetched.to_raw_data())
+
     try:
-        entries = YouTubeTranscriptApi.get_transcript(
-            video_id, languages=["en", "en-US", "en-GB"]
-        )
-        return " ".join(e["text"] for e in entries), None
-    except (TranscriptsDisabled, NoTranscriptFound):
+        # 1. Try English directly
+        try:
+            fetched = api.fetch(video_id, languages=("en", "en-US", "en-GB"))
+            return _entries_to_text(fetched), None
+        except NoTranscriptFound:
+            pass
+
+        # 2. List all transcripts and fall back gracefully
+        transcript_list = api.list(video_id)
+
+        # Try any transcript, preferring translatable ones
+        target = None
+        for t in transcript_list:
+            if t.is_translatable:
+                target = t
+                break
+        if target is None:
+            # grab whatever is available
+            for t in transcript_list:
+                target = t
+                break
+
+        if target is None:
+            return None, "no_transcript"
+
+        try:
+            fetched = target.translate("en").fetch()
+        except Exception:
+            fetched = target.fetch()   # raw language — GPT handles place names fine
+
+        return _entries_to_text(fetched), None
+
+    except TranscriptsDisabled:
         return None, "no_transcript"
     except VideoUnavailable:
         return None, "video_unavailable"

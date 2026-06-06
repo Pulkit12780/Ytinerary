@@ -153,5 +153,5 @@ async def health() -> dict:
     return {
         "status": "ok",
         "openai_key_set": bool(os.getenv("OPENAI_API_KEY")),
-        "foursquare_key_set": bool(os.getenv("FOURSQUARE_API_KEY")),
+        "opentripmap_key_set": bool(os.getenv("OPENTRIPMAP_API_KEY")),
     }

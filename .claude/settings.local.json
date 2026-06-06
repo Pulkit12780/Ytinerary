@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 .claude/skills/ui-ux-pro-max/scripts/search.py \"travel itinerary SaaS premium modern dark hero landing page\" --design-system -p \"Ytinerary\")"
+      "Bash(python3 .claude/skills/ui-ux-pro-max/scripts/search.py \"travel itinerary SaaS premium modern dark hero landing page\" --design-system -p \"Ytinerary\")",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(python3 *)",
+      "Bash(pkill -f \"uvicorn backend.main\")",
+      "Bash(uvicorn backend.main:app --port 8000)",
+      "Bash(curl -s -X POST http://localhost:8000/plan -H 'Content-Type: application/json' -d '{\"destination\":\"Jaipur, India\",\"youtube_urls\":[\"https://www.youtube.com/watch?v=VC7_2HHZ3RM\"]}')",
+      "Bash(pkill -f \"uvicorn\")",
+      "Bash(curl *)"
     ]
   }
 }
