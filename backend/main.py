@@ -16,10 +16,10 @@ load_dotenv()
 
 app = FastAPI(title="Ytinerary API", version="1.0.0")
 
+# No cookies/auth are used, so credentials stay disabled — required for "*" origins.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

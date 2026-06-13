@@ -28,7 +28,7 @@ Rules:
 - Deduplicate: if a place is mentioned several times, include it once
 """
 
-_MAX_TRANSCRIPT = 10_000  # characters sent to Haiku
+_MAX_TRANSCRIPT = 10_000  # characters sent to the model
 
 
 async def extract_places(transcript: str, destination: str, title: str = "") -> list[dict]:
@@ -51,6 +51,7 @@ async def extract_places(transcript: str, destination: str, title: str = "") -> 
             _client.chat.completions.create,
             model=_MODEL,
             max_tokens=2048,
+            response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": _SYSTEM},
                 {"role": "user", "content": prompt},

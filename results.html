@@ -8,51 +8,56 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
   <style>
     /* ─── TOKENS ──────────────────────────────────────── */
     :root {
-      --color-bg: #FFFFFF;
+      /* Warm editorial-travel palette — matches index.html */
+      --color-bg: #FAF8F4;
       --color-surface: #FFFFFF;
-      --color-sidebar-bg: #FAFAF9;
-      --color-border: #E4E2DC;
-      --color-border-subtle: #EDECEA;
-      --color-text-primary: #1A1917;
-      --color-text-secondary: #5C5A55;
-      --color-text-muted: #9B9891;
+      --color-sidebar-bg: #FBFAF7;
+      --color-border: #E8E3DA;
+      --color-border-subtle: #F1EDE6;
+      --color-text-primary: #1C1A17;
+      --color-text-secondary: #5C574F;
+      --color-text-muted: #968F84;
       --color-text-inverse: #FFFFFF;
 
-      --color-accent: #2563EB;
-      --color-accent-hover: #1D4ED8;
-      --color-accent-subtle: #EFF4FF;
-      --color-error: #DC2626;
-      --color-error-subtle: #FEF2F2;
-      --color-success: #16A34A;
-      --color-success-subtle: #F0FDF4;
-      --color-warning: #D97706;
-      --color-sparkle: #FCD34D;
+      --color-accent: #C85A3C;        /* clay */
+      --color-accent-hover: #B44E33;
+      --color-accent-subtle: #FBEEE9;
+      --color-error: #D14343;
+      --color-error-subtle: #FBEDED;
+      --color-success: #2E9E5B;
+      --color-success-subtle: #ECF7F0;
+      --color-warning: #C2410C;
+      --color-sparkle: #F4C45E;
 
-      /* Day palette — light theme */
-      --day-1: #2563EB; --day-1-dim: #EFF4FF;
-      --day-2: #16A34A; --day-2-dim: #F0FDF4;
-      --day-3: #D97706; --day-3-dim: #FFFBEB;
-      --day-4: #9333EA; --day-4-dim: #FAF5FF;
-      --day-5: #DB2777; --day-5-dim: #FDF2F8;
+      /* Day palette — warm editorial hues (keep in sync with JS DAY_COLORS/DAY_DIMS) */
+      --day-1: #C85A3C; --day-1-dim: #FBEEE9;
+      --day-2: #2E7D63; --day-2-dim: #E9F3EE;
+      --day-3: #C2902E; --day-3-dim: #FBF3E0;
+      --day-4: #8E5BA6; --day-4-dim: #F2EAF6;
+      --day-5: #C2557A; --day-5-dim: #FBE9F0;
 
-      /* Shadows */
-      --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
-      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.05);
-      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.05);
-      --shadow-card: 0 1px 3px rgba(0,0,0,0.06);
-      --shadow-card-hover: 0 8px 24px rgba(0,0,0,0.10);
-      --shadow-glow-accent: 0 0 0 3px rgba(37,99,235,0.18);
-      --shadow-tooltip: 0 4px 16px rgba(0,0,0,0.14);
+      /* Shadows — soft and warm */
+      --shadow-sm: 0 1px 2px 0 rgba(28,26,23,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(28,26,23,0.10), 0 2px 4px -2px rgba(28,26,23,0.06);
+      --shadow-lg: 0 18px 40px -12px rgba(28,26,23,0.16);
+      --shadow-card: 0 1px 3px rgba(28,26,23,0.05);
+      --shadow-card-hover: 0 12px 30px -10px rgba(28,26,23,0.18);
+      --shadow-glow-accent: 0 0 0 3px rgba(200,90,60,0.16);
+      --shadow-tooltip: 0 8px 24px rgba(28,26,23,0.16);
 
-      --nav-height: 60px;
-      --sidebar-width: 400px;
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+
+      --nav-height: 64px;
+      --sidebar-width: 408px;
     }
 
     /* ─── RESET ──────────────────────────────────────── */
@@ -129,12 +134,13 @@
     .back-link:hover .back-arrow { transform: translateX(-3px); }
     .back-arrow { display: inline-block; transition: transform 120ms ease-out; }
     .logo {
-      font-family: 'Manrope', sans-serif; font-weight: 800;
-      font-size: 18px; letter-spacing: -0.03em;
-      text-decoration: none; display: flex; align-items: center;
+      font-family: var(--font-display); font-weight: 600;
+      font-size: 21px; letter-spacing: -0.02em;
+      text-decoration: none; display: flex; align-items: baseline;
+      color: var(--color-text-primary);
     }
-    .logo-y   { color: #06C167; }
-    .logo-dot { color: #06C167; }
+    .logo-y    { color: var(--color-text-primary); }
+    .logo-dot  { color: var(--color-accent); }
     .logo-rest { color: var(--color-text-primary); }
     .topbar-dest {
       font-size: 14px; font-weight: 500; color: var(--color-text-muted);
@@ -142,12 +148,12 @@
       max-width: 220px;
     }
     .topbar-pill {
-      font-size: 11px; font-weight: 700;
-      letter-spacing: 0.05em; text-transform: uppercase;
-      color: #16A34A;
-      background: #F0FDF4;
-      border: 1px solid rgba(22,163,74,0.25);
-      border-radius: 9999px; padding: 4px 10px;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--color-text-secondary);
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 9999px; padding: 4px 11px;
     }
 
     /* ─── PAGE LAYOUT ────────────────────────────────── */
@@ -303,8 +309,9 @@
     }
     .header-text { flex: 1; min-width: 0; }
     .header-destination {
-      font-family: 'Inter', sans-serif;
-      font-size: 17px; font-weight: 600; color: var(--color-text-primary);
+      font-family: var(--font-display);
+      font-size: 21px; font-weight: 500; letter-spacing: -0.01em;
+      color: var(--color-text-primary);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .header-meta { font-size: 13px; color: var(--color-text-muted); margin-top: 2px; }
@@ -312,13 +319,13 @@
     /* ─── SHARE BUTTON ───────────────────────────────── */
     .share-btn {
       position: relative; overflow: hidden;
-      height: 32px; padding: 0 12px;
-      background: #FFFFFF;
+      height: 34px; padding: 0 14px;
+      background: var(--color-surface);
       border: 1px solid var(--color-border);
-      border-radius: 8px;
+      border-radius: 9999px;
       display: inline-flex; align-items: center; gap: 6px;
       font-size: 13px; font-weight: 500; color: var(--color-text-primary);
-      cursor: pointer; font-family: 'Inter', sans-serif;
+      cursor: pointer; font-family: var(--font-ui);
       transition: background 120ms, border-color 120ms, color 120ms;
       flex-shrink: 0;
       white-space: nowrap;
@@ -417,10 +424,10 @@
 
     /* ─── PLACE CARD ─────────────────────────────────── */
     .place-card {
-      background: #FFFFFF;
+      background: var(--color-surface);
       border: 1px solid var(--color-border);
       border-left: 3px solid transparent;
-      border-radius: 10px;
+      border-radius: 13px;
       padding: 12px 14px 12px 12px;
       box-shadow: var(--shadow-sm);
       margin-bottom: 8px; cursor: pointer;
@@ -605,17 +612,18 @@
       height: 100%; text-align: center; padding: 40px 24px;
     }
     .empty-state-icon { font-size: 48px; margin-bottom: 16px; }
-    .empty-state-title { font-size: 18px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 8px; }
+    .empty-state-title { font-family: var(--font-display); font-size: 24px; font-weight: 500; letter-spacing: -0.01em; color: var(--color-text-primary); margin-bottom: 8px; }
     .empty-state-body { font-size: 14px; color: var(--color-text-muted); line-height: 1.55; margin-bottom: 28px; }
     .empty-state-btn {
       display: inline-flex; align-items: center; gap: 8px;
-      height: 44px; padding: 0 24px;
-      background: #000000;
-      color: #FFFFFF; font-size: 15px; font-weight: 700; border-radius: 8px;
-      text-decoration: none; font-family: 'Manrope', sans-serif;
-      transition: background 100ms ease-out, transform 80ms ease-out;
+      height: 50px; padding: 0 26px;
+      background: var(--color-accent);
+      color: #FFFFFF; font-size: 15px; font-weight: 600; border-radius: 13px;
+      text-decoration: none; font-family: var(--font-ui);
+      box-shadow: 0 10px 30px -10px rgba(200,90,60,0.6);
+      transition: background 120ms ease, transform 120ms ease;
     }
-    .empty-state-btn:hover { background: #1A1A1A; transform: translateY(-1px); }
+    .empty-state-btn:hover { background: var(--color-accent-hover); transform: translateY(-2px); }
 
     /* ─── MOBILE ─────────────────────────────────────── */
     @media (max-width: 767px) {
@@ -664,7 +672,7 @@
         <span class="back-arrow">←</span><span>New Search</span>
       </a>
       <a href="index.html" class="logo" aria-label="Ytinerary home">
-        <span class="logo-y">Y</span><span class="logo-dot">·</span><span class="logo-rest">tinerary</span>
+        <span class="logo-rest">Ytinerary</span><span class="logo-dot">.</span>
       </a>
     </div>
     <div class="topbar-dest" id="topbar-dest" aria-live="polite"></div>
@@ -770,9 +778,9 @@
   (function () {
     'use strict';
 
-    /* ── Day palette — light theme ── */
-    var DAY_COLORS = ['#2563EB','#16A34A','#D97706','#9333EA','#DB2777'];
-    var DAY_DIMS   = ['#EFF4FF','#F0FDF4','#FFFBEB','#FAF5FF','#FDF2F8'];
+    /* ── Day palette — warm editorial hues (keep in sync with CSS --day-* tokens) ── */
+    var DAY_COLORS = ['#C85A3C','#2E7D63','#C2902E','#8E5BA6','#C2557A'];
+    var DAY_DIMS   = ['#FBEEE9','#E9F3EE','#FBF3E0','#F2EAF6','#FBE9F0'];
 
     /* ── State ── */
     var planData       = null;
@@ -818,6 +826,17 @@
        DATA LOADING
     ────────────────────────────────────────────── */
     function loadData() {
+      /* Shared link — full plan encoded in the URL hash */
+      if (location.hash.indexOf('#plan=') === 0) {
+        try {
+          planData = decodePlan(location.hash.slice(6));
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('[Ytinerary] Failed to decode shared plan:', e);
+        }
+      }
+
       var raw = null;
       try { raw = sessionStorage.getItem('ytinerary_result'); } catch (e) {
         console.warn('[Ytinerary] sessionStorage read failed:', e);
@@ -1076,7 +1095,33 @@
         card.remove();
       }
       removePin(di, pi);
+      markPlaceRemoved(di, pi);
+      updateHeaderMeta();
+      if (activeDay === di) {
+        clearPolyline();
+        drawPolyline(di, DAY_COLORS[di % DAY_COLORS.length]);
+      }
       announce('Removed ' + (card.dataset.name || 'place') + ' from itinerary');
+    }
+
+    function markPlaceRemoved(di, pi) {
+      if (!planData) return;
+      var arr = di >= 0
+        ? (planData.clusters && planData.clusters[di] && planData.clusters[di].places)
+        : planData.more_to_explore;
+      if (arr && arr[pi]) arr[pi]._removed = true;
+    }
+
+    function updateHeaderMeta() {
+      if (!planData) return;
+      var total = 0;
+      (planData.clusters || []).forEach(function (day) {
+        (day.places || []).slice(0, 5).forEach(function (p) { if (!p._removed) total++; });
+      });
+      (planData.more_to_explore || []).forEach(function (p) { if (!p._removed) total++; });
+      planData.total_places = total;
+      var days = planData.clusters ? planData.clusters.length : 0;
+      setText('header-meta', total + ' places · ' + days + ' day' + (days !== 1 ? 's' : ''));
     }
 
     function buildMoreSection(places) {
@@ -1339,9 +1384,11 @@
       drawPolyline(di, color);
 
       var day = planData.clusters[di];
+      var remaining = day && day.places
+        ? day.places.filter(function (p) { return !p._removed; }).length : 0;
       announce('Showing ' + (day ? (day.date_label || 'Day ' + day.day_number) : '') +
         (day && day.theme_label ? ': ' + day.theme_label : '') +
-        '. ' + (day && day.places ? day.places.length : 0) + ' places.');
+        '. ' + remaining + ' places.');
     }
 
     function deactivateDayFilter() {
@@ -1367,7 +1414,7 @@
       var day = planData.clusters[di];
       if (!day || !day.places) return;
       var coords = day.places
-        .filter(function (p) { return p.lat != null && p.lng != null; })
+        .filter(function (p) { return !p._removed && p.lat != null && p.lng != null; })
         .map(function (p) { return [p.lat, p.lng]; });
       if (coords.length < 2) return;
 
@@ -1442,7 +1489,7 @@
     function emitTogglePulse(btn) {
       if (reduced) return;
       var s = el('span');
-      s.style.cssText = 'position:absolute;inset:0;border-radius:inherit;background:rgba(37,99,235,0.12);transform:scale(0);pointer-events:none;';
+      s.style.cssText = 'position:absolute;inset:0;border-radius:inherit;background:rgba(200,90,60,0.12);transform:scale(0);pointer-events:none;';
       btn.appendChild(s);
       requestAnimationFrame(function () {
         s.style.transition = 'transform 320ms cubic-bezier(0.34,1.40,0.64,1), opacity 320ms';
@@ -1456,13 +1503,39 @@
     ────────────────────────────────────────────── */
     function initShareBtn() {
       document.getElementById('share-btn').addEventListener('click', function () {
+        /* Encode the (edited) plan into the link so recipients see the same itinerary */
         var url = location.href;
+        if (planData) {
+          try {
+            url = location.origin + location.pathname + '#plan=' + encodePlan(cleanPlan(planData));
+          } catch (e) { console.warn('[Ytinerary] Plan encoding failed, sharing page URL:', e); }
+        }
         if (navigator.clipboard) {
           navigator.clipboard.writeText(url).then(copiedState).catch(function () { fallbackCopy(url); });
         } else {
           fallbackCopy(url);
         }
       });
+    }
+
+    /* Plan ⇄ URL-safe base64 (handles unicode place names) */
+    function encodePlan(data) {
+      var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+      return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+    function decodePlan(s) {
+      s = s.replace(/-/g, '+').replace(/_/g, '/');
+      while (s.length % 4) s += '=';
+      return JSON.parse(decodeURIComponent(escape(atob(s))));
+    }
+    /* Copy of the plan without places the user removed */
+    function cleanPlan(data) {
+      var copy = JSON.parse(JSON.stringify(data));
+      (copy.clusters || []).forEach(function (day) {
+        day.places = (day.places || []).filter(function (p) { return !p._removed; });
+      });
+      copy.more_to_explore = (copy.more_to_explore || []).filter(function (p) { return !p._removed; });
+      return copy;
     }
 
     function fallbackCopy(text) {

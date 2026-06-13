@@ -2,6 +2,7 @@
 from __future__ import annotations
 import re
 import asyncio
+import httpx
 from .. import cache
 
 
@@ -80,6 +81,22 @@ def _fetch_via_api(video_id: str) -> tuple[str, None] | tuple[None, str]:
         return None, "api_error"
 
 
+async def _fetch_title_oembed(url: str) -> str | None:
+    """Fetch the video title via YouTube's oEmbed endpoint (fast, no API key)."""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://www.youtube.com/oembed",
+                params={"url": url, "format": "json"},
+                timeout=5.0,
+            )
+            if resp.status_code == 200:
+                return resp.json().get("title")
+    except Exception:
+        pass
+    return None
+
+
 def _fetch_via_ytdlp(url: str) -> dict:
     """Returns {title, transcript, error}. Uses description as transcript fallback."""
     try:
@@ -125,12 +142,8 @@ async def fetch_transcript(url: str) -> dict:
     transcript_text, api_error = await asyncio.to_thread(_fetch_via_api, video_id)
 
     if transcript_text:
-        # Get title via yt-dlp metadata (best-effort, don't fail the pipeline)
-        try:
-            ytdlp_data = await asyncio.to_thread(_fetch_via_ytdlp, url)
-            title = ytdlp_data.get("title") or video_id
-        except Exception:
-            title = video_id
+        # Get title via oEmbed (best-effort, don't fail the pipeline)
+        title = (await _fetch_title_oembed(url)) or video_id
 
         result = {"url": url, "video_id": video_id, "title": title, "transcript": transcript_text, "error": None}
         cache.set(url, result)

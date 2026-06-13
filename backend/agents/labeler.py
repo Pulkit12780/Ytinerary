@@ -18,7 +18,7 @@ def _day_date_labels(
         try:
             d = date.fromisoformat(start_date)
             return [
-                (d + timedelta(days=i)).strftime("%A, %b %-d")
+                f"{(d + timedelta(days=i)):%A, %b} {(d + timedelta(days=i)).day}"
                 for i in range(num_clusters)
             ]
         except ValueError:
@@ -61,6 +61,7 @@ async def label_clusters(
             _client.chat.completions.create,
             model=_MODEL,
             max_tokens=256,
+            response_format={"type": "json_object"},
             messages=[{"role": "user", "content": prompt}],
         )
         raw = response.choices[0].message.content

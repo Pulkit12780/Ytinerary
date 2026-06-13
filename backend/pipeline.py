@@ -48,6 +48,33 @@ async def _emit(queue: Any, event: dict) -> None:
         await queue.put(event)
 
 
+def _places_from_maps_links(links: list | None) -> list[dict]:
+    """Parse place names out of Google Maps URLs the user explicitly added."""
+    import re
+    from urllib.parse import unquote_plus, urlparse, parse_qs
+
+    out: list[dict] = []
+    for link in links or []:
+        name = None
+        m = re.search(r"/maps/place/([^/@?]+)", link)
+        if m:
+            name = unquote_plus(m.group(1))
+        else:
+            qs = parse_qs(urlparse(link).query)
+            q = (qs.get("q") or qs.get("query") or [None])[0]
+            # Skip raw "lat,lng" queries — there's no name to geocode
+            if q and not re.match(r"^-?\d+(\.\d+)?\s*,", q):
+                name = q
+        if name and name.strip():
+            out.append({
+                "name": name.strip(),
+                "sentiment": "positive",
+                "context": "added by you",
+                "source_videos": [],
+            })
+    return out
+
+
 def _num_days(req: dict) -> int | None:
     sd = req.get("start_date")
     ed = req.get("end_date")
@@ -119,6 +146,9 @@ async def extract_places(state: PipelineState) -> dict:
     # Drop clearly negative-sentiment places
     positive_places = [p for p in all_places if p.get("sentiment") != "negative"]
 
+    # Must-include places the user pasted as Google Maps links
+    positive_places.extend(_places_from_maps_links(req.get("maps_links")))
+
     if not positive_places:
         return {
             "raw_places": [],
@@ -166,7 +196,7 @@ async def geocode_places(state: PipelineState) -> dict:
             "hotel": hotel_result,
             "error": "None of the extracted places could be located. "
                      "Try adding the destination country for better results.",
-            "error_code": "ZERO_PLACES",
+            "error_code": "GEOCODING_FAILURE",
         }
 
     return {
@@ -289,7 +319,7 @@ def _build_response(state: PipelineState) -> PlanResponse:
             hours=p.get("hours"),
             description=p.get("description"),
             photo_url=p.get("photo_url"),
-            foursquare_id=p.get("foursquare_id"),
+            place_id=p.get("place_id"),
             source_videos=[
                 SourceVideo(url=sv["url"], title=sv["title"])
                 for sv in p.get("source_videos", [])

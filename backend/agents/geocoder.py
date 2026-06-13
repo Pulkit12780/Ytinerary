@@ -114,7 +114,9 @@ async def _geocode_one_otm(
             "lat": place_lat,
             "lng": place_lon,
             "category": category,
-            "rating": props.get("rate"),
+            # OTM "rate" is a 1-7 popularity index (sometimes a string like "3h"),
+            # not a star rating — don't surface it as one.
+            "rating": None,
             "hours": None,
             "description": wiki,
             "photo_url": image,
@@ -200,7 +202,7 @@ async def geocode_places(
             if isinstance(geo, Exception) or geo is None:
                 nom = await _geocode_one_nominatim(place_input["name"], destination, client)
                 final_results.append(nom)
-                await asyncio.sleep(0.25)
+                await asyncio.sleep(1.1)  # Nominatim usage policy: max 1 req/sec
             else:
                 final_results.append(geo)
 

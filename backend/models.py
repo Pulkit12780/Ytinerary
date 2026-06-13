@@ -21,9 +21,11 @@ class PlanRequest(BaseModel):
 
     @field_validator("youtube_urls")
     @classmethod
-    def at_least_one_url(cls, v: list[str]) -> list[str]:
+    def one_to_five_urls(cls, v: list[str]) -> list[str]:
         if not v:
             raise ValueError("at least one YouTube URL is required")
+        if len(v) > 5:
+            raise ValueError("a maximum of 5 YouTube URLs is allowed")
         return v
 
 
