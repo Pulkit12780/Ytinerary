@@ -213,7 +213,19 @@ async def geocode_places(
         if geo is None:
             unresolved.append(place_input["name"])
         else:
-            enriched.append({**geo, "source_videos": place_input.get("source_videos", [])})
+            in_cat = place_input.get("category")
+            # Keep the richer geocoded category for display, but never lose the
+            # "food" signal the extractor/augmenter set — the judge relies on it
+            # to slot restaurants into meal times.
+            category = "food" if in_cat == "food" else (geo.get("category") or in_cat)
+            enriched.append({
+                **geo,
+                "category": category,
+                "description": geo.get("description") or place_input.get("description"),
+                "meal_type": place_input.get("meal_type"),
+                "source": place_input.get("source", "video"),
+                "source_videos": place_input.get("source_videos", []),
+            })
 
     return enriched, unresolved
 

@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 
+from . import metrics
 from .models import PlanRequest, PlanResponse, ErrorResponse
 from .pipeline import run as run_pipeline, PipelineError
 
@@ -26,6 +27,7 @@ app.add_middleware(
 
 _ERROR_STATUS: dict[str, int] = {
     "INVALID_DESTINATION": 422,
+    "NO_VIDEOS_FOUND": 404,
     "MISSING_TRANSCRIPT": 404,
     "ZERO_PLACES": 422,
     "GEOCODING_FAILURE": 502,
@@ -154,4 +156,15 @@ async def health() -> dict:
         "status": "ok",
         "openai_key_set": bool(os.getenv("OPENAI_API_KEY")),
         "opentripmap_key_set": bool(os.getenv("OPENTRIPMAP_API_KEY")),
+        "youtube_key_set": bool(os.getenv("YOUTUBE_API_KEY")),
     }
+
+
+# ── Metrics (brief §8 / E3) ──────────────────────────────────────────────────
+
+
+@app.get("/metrics")
+async def metrics_endpoint() -> dict:
+    """Process-local success metrics: zero-URL share, time-to-first-plan,
+    fallback usage, NO_VIDEOS_FOUND rate. Resets on restart."""
+    return metrics.snapshot()

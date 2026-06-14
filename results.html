@@ -242,6 +242,52 @@
     .legend-row + .legend-row { margin-top: 6px; }
     .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
+    /* ─── DAY TABS (map overlay) ─────────────────────── */
+    .day-tabs {
+      position: absolute; top: 14px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex; gap: 3px;
+      max-width: calc(100% - 96px);
+      padding: 4px;
+      background: rgba(255,255,255,0.94);
+      border: 1px solid var(--color-border);
+      border-radius: 9999px;
+      box-shadow: var(--shadow-md);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .day-tabs::-webkit-scrollbar { display: none; }
+    .day-tab {
+      flex-shrink: 0;
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 32px; padding: 0 14px;
+      border: none; border-radius: 9999px;
+      background: transparent;
+      font-family: var(--font-ui);
+      font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
+      color: var(--color-text-secondary);
+      white-space: nowrap; cursor: pointer;
+      transition: background 160ms ease-out, color 160ms ease-out, transform 120ms ease-out;
+    }
+    .day-tab:hover { background: var(--color-bg); color: var(--color-text-primary); }
+    .day-tab:active { transform: scale(0.96); }
+    .day-tab.active { color: #FFFFFF; }
+    .day-tab-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      transition: background 160ms ease-out;
+    }
+
+    @media (max-width: 767px) {
+      .day-tabs {
+        top: 12px; left: 12px; right: 12px;
+        transform: none; max-width: none;
+        justify-content: flex-start;
+      }
+    }
+
     /* ─── SIDEBAR WRAP ───────────────────────────────── */
     .sidebar-wrap {
       position: relative;
@@ -481,6 +527,31 @@
     }
     .place-card:hover .video-title { color: var(--color-text-secondary); }
 
+    /* Meal + source tags */
+    .meal-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      border-radius: 9999px; padding: 2px 8px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+      background: #FBF3E0; color: #B57A12; white-space: nowrap; flex-shrink: 0;
+    }
+    .time-chip { font-size: 11px; color: var(--color-text-muted); white-space: nowrap; }
+    .day-note {
+      font-size: 12px; color: var(--color-text-muted); line-height: 1.5;
+      margin: 4px 0 10px; font-style: italic;
+    }
+    .plan-warnings {
+      margin: 4px 0 14px; padding: 10px 12px;
+      background: #FBF3E0; border: 1px solid #EAD9AE; border-radius: 8px;
+      font-size: 12px; color: #8A6516; line-height: 1.55;
+    }
+    .plan-warnings .pw-title { font-weight: 600; margin-bottom: 4px; }
+    .plan-warnings ul { margin: 0; padding-left: 16px; }
+    .suggested-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; color: var(--color-text-muted);
+    }
+    .suggested-chip .spark { flex-shrink: 0; }
+
     /* Caret */
     .card-caret {
       position: absolute; top: 11px; right: 11px;
@@ -687,6 +758,9 @@
     <!-- Map panel -->
     <div class="map-panel">
       <div id="map" role="application" aria-label="Interactive trip map"></div>
+      <!-- Day tabs (JS-populated) — filter + auto-zoom the map by day -->
+      <div class="day-tabs" id="day-tabs" role="tablist"
+           aria-label="Filter itinerary by day" style="display:none;"></div>
       <div class="map-legend" id="map-legend" aria-hidden="true"></div>
     </div>
 
@@ -787,7 +861,7 @@
     var map            = null;
     var pinMarkers     = [];
     var activeDay      = -1;
-    var activePolyline = null;
+    var routeLayers    = [];   /* casing + line + arrows + Start/End labels for the active day */
     var reduced        = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     /* ── Boot ── */
@@ -880,6 +954,7 @@
 
       renderSidebar(itinerary);
       renderMap();
+      buildDayTabs();
 
       if (planData.unresolved_places && planData.unresolved_places.length > 0) {
         showBanner(planData.unresolved_places.length + ' place' +
@@ -901,6 +976,17 @@
     function renderSidebar(container) {
       container.innerHTML = '';
       if (!planData.clusters) return;
+
+      if (planData.warnings && planData.warnings.length) {
+        var pw = el('div', 'plan-warnings');
+        var pwt = el('div', 'pw-title'); pwt.textContent = 'A few notes on feasibility';
+        var ul = el('ul');
+        planData.warnings.forEach(function (w) {
+          var li = el('li'); li.textContent = w; ul.appendChild(li);
+        });
+        pw.append(pwt, ul);
+        container.appendChild(pw);
+      }
 
       planData.clusters.forEach(function (day, di) {
         var color = DAY_COLORS[di % DAY_COLORS.length];
@@ -943,7 +1029,7 @@
         var r = header.getBoundingClientRect();
         emitRipple(header, (e.clientX || r.left + r.width/2) - r.left,
                             (e.clientY || r.top + r.height/2) - r.top, dim);
-        toggleDayFilter(di, color, dim);
+        toggleDayFilter(di);
       }
       header.addEventListener('click', activateHeader);
       header.addEventListener('keydown', function (e) {
@@ -953,7 +1039,12 @@
       var lineSep = el('div', 'day-section-sep');
       section.append(header, lineSep);
 
-      (day.places || []).slice(0, 5).forEach(function (place, pi) {
+      if (day.notes) {
+        var note = el('div', 'day-note'); note.textContent = day.notes;
+        section.appendChild(note);
+      }
+
+      (day.places || []).forEach(function (place, pi) {
         var card = buildPlaceCard(place, di, pi, color, dim);
         if (!reduced) {
           card.classList.add('card-enter');
@@ -978,7 +1069,11 @@
       var row1 = el('div', 'place-card-row1');
       var nameEl = el('span', 'place-name'); nameEl.textContent = place.name || '';
       row1.appendChild(nameEl);
-      if (!noBadge && di >= 0) {
+      if (place.meal_type) {
+        var meal = el('span', 'meal-badge');
+        meal.innerHTML = '<span>🍽</span> ' + place.meal_type.charAt(0).toUpperCase() + place.meal_type.slice(1);
+        row1.appendChild(meal);
+      } else if (!noBadge && di >= 0) {
         var badge = el('span', 'place-day-badge');
         badge.style.background = dim;
         badge.style.color = color;
@@ -987,7 +1082,14 @@
       }
 
       var row2 = el('div', 'place-card-row2');
-      if (place.category) { var cat = el('span'); cat.textContent = place.category; row2.appendChild(cat); }
+      if (place.time_of_day) {
+        var tod = el('span', 'time-chip'); tod.textContent = place.time_of_day;
+        row2.appendChild(tod);
+      }
+      if (place.category) {
+        if (place.time_of_day) { var d0 = el('span'); d0.textContent = '·'; row2.appendChild(d0); }
+        var cat = el('span'); cat.textContent = place.category; row2.appendChild(cat);
+      }
       if (place.rating) {
         var dot2 = el('span'); dot2.textContent = '·'; row2.appendChild(dot2);
         var rat = el('span', 'place-rating');
@@ -1002,6 +1104,11 @@
         var emoji = el('span', 'video-emoji'); emoji.textContent = '📹';
         var vtitle = el('span', 'video-title'); vtitle.textContent = firstVid.title || 'YouTube video';
         row3.append(emoji, vtitle);
+      } else if (place.source === 'suggested') {
+        row3 = el('div', 'place-card-row3');
+        var chip = el('span', 'suggested-chip');
+        chip.innerHTML = '<span class="spark">✨</span><span>Suggested for you</span>';
+        row3.appendChild(chip);
       }
 
       var caret = el('div', 'card-caret');
@@ -1098,8 +1205,8 @@
       markPlaceRemoved(di, pi);
       updateHeaderMeta();
       if (activeDay === di) {
-        clearPolyline();
-        drawPolyline(di, DAY_COLORS[di % DAY_COLORS.length]);
+        numberDayPins(di);   /* resequence remaining stops */
+        drawRoute(di, DAY_COLORS[di % DAY_COLORS.length]);
       }
       announce('Removed ' + (card.dataset.name || 'place') + ' from itinerary');
     }
@@ -1162,6 +1269,45 @@
       return sec;
     }
 
+    /* Build a teardrop pin icon. `label` shows inside (day number, or stop
+       sequence when a day is selected); food stops show a fork glyph instead. */
+    function makePinIcon(color, label, isFood, animStyle) {
+      var glyph = isFood
+        ? '<g transform="translate(7,7) scale(0.58)" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M3 2v7c0 1.1.9 2 2 2h0a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/>' +
+            '<path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></g>'
+        : '<text x="14" y="18" text-anchor="middle" dominant-baseline="central"' +
+            ' fill="#fff" font-family="Inter,sans-serif" font-size="11" font-weight="700">' + label + '</text>';
+      return L.divIcon({
+        html: '<div style="transform-origin:50% 100%;' + (animStyle || '') +
+          'filter:drop-shadow(0 2px 4px rgba(0,0,0,0.25));">' +
+          '<svg width="28" height="36" viewBox="0 0 28 36" overflow="visible">' +
+          '<path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22s14-12.667 14-22C28 6.268 21.732 0 14 0z"' +
+          ' fill="' + color + '" stroke="#FFFFFF" stroke-width="2"/>' +
+          glyph +
+          '</svg></div>',
+        iconSize:[28,36], iconAnchor:[14,36], popupAnchor:[0,-38], className:''
+      });
+    }
+
+    /* When a day is selected, relabel its pins 1→N in visiting order so the
+       route reads start → middle → end. restore puts day numbers / food glyphs back. */
+    function numberDayPins(di) {
+      pinMarkers
+        .filter(function (pm) { return pm.di === di; })
+        .sort(function (a, b) { return a.pi - b.pi; })
+        .forEach(function (pm, idx) {
+          pm.marker.setIcon(makePinIcon(pm.color, idx + 1, false, ''));
+        });
+    }
+    function restoreDayPins(di) {
+      pinMarkers
+        .filter(function (pm) { return pm.di === di; })
+        .forEach(function (pm) {
+          pm.marker.setIcon(makePinIcon(pm.color, pm.baseLabel, pm.isFood, ''));
+        });
+    }
+
     /* ──────────────────────────────────────────────
        MAP RENDER
     ────────────────────────────────────────────── */
@@ -1174,12 +1320,14 @@
         var h = planData.hotel;
         allCoords.push([h.lat, h.lng]);
         var hIcon = L.divIcon({
-          html: '<div style="transform-origin:50% 50%;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.35));opacity:0;transition:opacity 200ms ease-out;">' +
-            '<svg width="32" height="32" viewBox="0 0 32 32" overflow="visible">' +
-            '<rect x="1" y="1" width="30" height="30" rx="6" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>' +
-            '<text x="16" y="22" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="14">⌂</text>' +
-            '</svg></div>',
-          iconSize:[32,32], iconAnchor:[16,16], popupAnchor:[0,-20], className:''
+          html: '<div style="transform-origin:50% 100%;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.35));opacity:0;transition:opacity 200ms ease-out;">' +
+            '<svg width="30" height="40" viewBox="0 0 28 36" overflow="visible">' +
+            '<path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22s14-12.667 14-22C28 6.268 21.732 0 14 0z"' +
+            ' fill="#334155" stroke="#FFFFFF" stroke-width="2"/>' +
+            '<g transform="translate(6.4,6.6) scale(0.62)" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>' +
+            '</g></svg></div>',
+          iconSize:[30,40], iconAnchor:[15,40], popupAnchor:[0,-40], className:''
         });
         var hm = L.marker([h.lat, h.lng], { icon: hIcon }).addTo(map);
         hm.on('add', function () {
@@ -1196,26 +1344,20 @@
       planData.clusters.forEach(function (day, di) {
         var color = DAY_COLORS[di % DAY_COLORS.length];
         if (!day.places) return;
-        day.places.slice(0, 5).forEach(function (place, pi) {
+        day.places.forEach(function (place, pi) {
           if (place.lat == null || place.lng == null) return;
           allCoords.push([place.lat, place.lng]);
           var enterDelay = 480 + (di * 280 + pi * 60 > 1800 ? 0 : di * 280 + pi * 60);
           var animStyle = reduced ? '' :
             'animation:pin-drop 520ms cubic-bezier(0.22,1.61,0.36,1) ' + enterDelay + 'ms both;';
-          var icon = L.divIcon({
-            html: '<div style="transform-origin:50% 100%;' + animStyle +
-              'filter:drop-shadow(0 2px 4px rgba(0,0,0,0.25));">' +
-              '<svg width="28" height="36" viewBox="0 0 28 36" overflow="visible">' +
-              '<path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22s14-12.667 14-22C28 6.268 21.732 0 14 0z"' +
-              ' fill="' + color + '" stroke="#FFFFFF" stroke-width="2"/>' +
-              '<text x="14" y="18" text-anchor="middle" dominant-baseline="central"' +
-              ' fill="#fff" font-family="Inter,sans-serif" font-size="11" font-weight="700">' + (di+1) + '</text>' +
-              '</svg></div>',
-            iconSize:[28,36], iconAnchor:[14,36], popupAnchor:[0,-38], className:''
-          });
+          var isFood = !!(place.meal_type || place.category === 'food');
+          var icon = makePinIcon(color, di + 1, isFood, animStyle);
 
           var marker = L.marker([place.lat, place.lng], { icon: icon }).addTo(map);
-          marker.bindPopup(popupHtml(place.name, place.category, place.rating, color));
+          var catLabel = place.meal_type
+            ? place.meal_type.charAt(0).toUpperCase() + place.meal_type.slice(1)
+            : place.category;
+          marker.bindPopup(popupHtml(place.name, catLabel, place.rating, color));
 
           marker.on('mouseover', function () {
             syncCardFromPin(di, pi, true, color);
@@ -1224,7 +1366,8 @@
           marker.on('mouseout', function () { syncCardFromPin(di, pi, false, color); });
           marker.on('click', function () { marker.openPopup(); });
 
-          pinMarkers.push({ marker:marker, di:di, pi:pi, color:color, place:place });
+          pinMarkers.push({ marker:marker, di:di, pi:pi, color:color, place:place,
+                            isFood:isFood, baseLabel:(di + 1) });
         });
       });
 
@@ -1261,6 +1404,18 @@
         row.append(dot, label);
         leg.appendChild(row);
       });
+      if (planData.hotel && planData.hotel.lat) {
+        var hrow = el('div', 'legend-row');
+        var hdot = el('span', 'legend-dot'); hdot.style.background = '#334155';
+        var hlabel = el('span'); hlabel.textContent = '🛏 Hotel';
+        hrow.append(hdot, hlabel);
+        leg.appendChild(hrow);
+      }
+      var frow = el('div', 'legend-row');
+      var fdot = el('span', 'legend-dot'); fdot.style.background = 'transparent';
+      var flabel = el('span'); flabel.textContent = '🍽 Dining stop';
+      frow.append(fdot, flabel);
+      leg.appendChild(frow);
     }
 
     /* ──────────────────────────────────────────────
@@ -1343,14 +1498,117 @@
     /* ──────────────────────────────────────────────
        DAY FILTER
     ────────────────────────────────────────────── */
-    function toggleDayFilter(di, color, dim) {
-      if (activeDay === di) deactivateDayFilter();
-      else activateDayFilter(di, color, dim);
+    /* Central entry point: select a day (di) or the full trip (di = -1).
+       Keeps tabs, sidebar, pins, route line, and the map zoom all in sync. */
+    function setActiveDay(di) {
+      if (di < 0) {
+        deactivateDayFilter();
+      } else {
+        var color = DAY_COLORS[di % DAY_COLORS.length];
+        var dim   = DAY_DIMS[di % DAY_DIMS.length];
+        activateDayFilter(di, color, dim);
+      }
+      syncTabs(di);
+      zoomToDay(di);
+    }
+
+    function toggleDayFilter(di) {
+      setActiveDay(activeDay === di ? -1 : di);
+    }
+
+    /* ──────────────────────────────────────────────
+       DAY TABS
+    ────────────────────────────────────────────── */
+    function buildDayTabs() {
+      var wrap = document.getElementById('day-tabs');
+      if (!wrap || !planData || !planData.clusters || !planData.clusters.length) {
+        if (wrap) wrap.style.display = 'none';
+        return;
+      }
+      wrap.innerHTML = '';
+      wrap.appendChild(makeTab(-1, 'Full Trip', null));
+      planData.clusters.forEach(function (day, di) {
+        var label = day.date_label || ('Day ' + day.day_number);
+        wrap.appendChild(makeTab(di, label, DAY_COLORS[di % DAY_COLORS.length]));
+      });
+      wrap.style.display = 'flex';
+      syncTabs(activeDay);
+    }
+
+    function makeTab(di, label, color) {
+      var b = el('button', 'day-tab');
+      b.type = 'button';
+      b.dataset.di = di;
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', 'false');
+      if (color) {
+        var dot = el('span', 'day-tab-dot');
+        dot.style.background = color;
+        b.appendChild(dot);
+      }
+      var txt = el('span'); txt.textContent = label;
+      b.appendChild(txt);
+      b.addEventListener('click', function () { setActiveDay(di); });
+      return b;
+    }
+
+    function syncTabs(di) {
+      document.querySelectorAll('.day-tab').forEach(function (t) {
+        var tdi = parseInt(t.dataset.di);
+        var on  = tdi === di;
+        var dayColor = tdi >= 0 ? DAY_COLORS[tdi % DAY_COLORS.length] : null;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        var dot = t.querySelector('.day-tab-dot');
+        if (on) {
+          t.style.background = dayColor || 'var(--color-text-primary)';
+          if (dot) dot.style.background = 'rgba(255,255,255,0.92)';
+          t.scrollIntoView({ block: 'nearest', inline: 'center',
+            behavior: reduced ? 'auto' : 'smooth' });
+        } else {
+          t.style.background = '';
+          if (dot) dot.style.background = dayColor || '';
+        }
+      });
+    }
+
+    /* Pan + zoom the map so the chosen day (or the whole trip) fits the view —
+       no manual zooming/panning required. */
+    function zoomToDay(di) {
+      if (!map) return;
+      var pts = [];
+      pinMarkers.forEach(function (pm) {
+        if (di < 0 || pm.di === di) pts.push(pm.marker.getLatLng());
+      });
+      if (di < 0 && planData.hotel && planData.hotel.lat != null && planData.hotel.lng != null) {
+        pts.push(L.latLng(planData.hotel.lat, planData.hotel.lng));
+      }
+      if (!pts.length) return;
+
+      var isMobile = window.innerWidth < 768;
+      var topPad   = 60;                 /* clear the floating tab bar */
+      var botPad   = isMobile ? 150 : 48; /* clear the mobile bottom sheet */
+      try {
+        if (pts.length === 1) {
+          map.setView(pts[0], 15, { animate: !reduced });
+        } else {
+          map.fitBounds(L.latLngBounds(pts), {
+            paddingTopLeft:     [48, topPad],
+            paddingBottomRight: [48, botPad],
+            maxZoom: 16,
+            animate: !reduced,
+            duration: 0.6
+          });
+        }
+      } catch (e) { /* fitBounds can throw on degenerate bounds — ignore */ }
     }
 
     function activateDayFilter(di, color, dim) {
+      /* If switching straight from another day, put its pins back to day numbers first. */
+      if (activeDay >= 0 && activeDay !== di) restoreDayPins(activeDay);
       activeDay = di;
-      clearPolyline();
+      clearRoute();
+      numberDayPins(di);
 
       document.querySelectorAll('.day-section-header').forEach(function (h) {
         var hdi = parseInt(h.dataset.di);
@@ -1381,7 +1639,7 @@
         }
       });
 
-      drawPolyline(di, color);
+      drawRoute(di, color);
 
       var day = planData.clusters[di];
       var remaining = day && day.places
@@ -1392,8 +1650,9 @@
     }
 
     function deactivateDayFilter() {
+      if (activeDay >= 0) restoreDayPins(activeDay);  /* back to day-number pins */
       activeDay = -1;
-      clearPolyline();
+      clearRoute();
 
       document.querySelectorAll('.day-section-header').forEach(function (h) {
         h.classList.remove('active', 'dimmed');
@@ -1410,7 +1669,10 @@
       announce('Showing all days.');
     }
 
-    function drawPolyline(di, color) {
+    /* Draw the day's route: a white-cased solid line with direction arrows
+       and Start / End labels so the sequence reads at a glance. */
+    function drawRoute(di, color) {
+      clearRoute();
       var day = planData.clusters[di];
       if (!day || !day.places) return;
       var coords = day.places
@@ -1418,40 +1680,78 @@
         .map(function (p) { return [p.lat, p.lng]; });
       if (coords.length < 2) return;
 
-      activePolyline = L.polyline(coords, {
-        color: color, weight: 2.5, opacity: 0.85,
-        dashArray: '4 6', lineCap: 'round', lineJoin: 'round', interactive: false
+      /* 1 — white casing underneath for contrast against the map */
+      var casing = L.polyline(coords, {
+        color: '#FFFFFF', weight: 6.5, opacity: 0.95,
+        lineCap: 'round', lineJoin: 'round', interactive: false
       }).addTo(map);
+      /* 2 — main coloured route on top */
+      var main = L.polyline(coords, {
+        color: color, weight: 3.5, opacity: 0.95,
+        lineCap: 'round', lineJoin: 'round', interactive: false
+      }).addTo(map);
+      routeLayers.push(casing, main);
 
+      /* 3 — a direction arrow at the midpoint of each leg */
+      for (var i = 0; i < coords.length - 1; i++) {
+        var a = coords[i], b = coords[i + 1];
+        var pa = map.latLngToContainerPoint(a);
+        var pb = map.latLngToContainerPoint(b);
+        var ang = Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI;
+        var arrow = L.marker([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], {
+          interactive: false, keyboard: false,
+          icon: L.divIcon({
+            className: '', iconSize: [18, 18], iconAnchor: [9, 9],
+            html: '<div style="transform:rotate(' + ang + 'deg);width:18px;height:18px;' +
+              'display:flex;align-items:center;justify-content:center;color:' + color + ';' +
+              'filter:drop-shadow(0 0 2px rgba(255,255,255,0.95));">' +
+              '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+              'stroke-width="4" stroke-linecap="round" stroke-linejoin="round">' +
+              '<polyline points="9 6 15 12 9 18"/></svg></div>'
+          })
+        }).addTo(map);
+        routeLayers.push(arrow);
+      }
+
+      /* 4 — Start / End labels floating above the first and last pins */
+      routeLayers.push(endpointLabel(coords[0], 'Start', color));
+      routeLayers.push(endpointLabel(coords[coords.length - 1], 'End', color));
+
+      /* 5 — animate the main line drawing itself in on selection */
       if (!reduced) {
         requestAnimationFrame(function () {
-          var path = activePolyline._path;
+          var path = main._path;
           if (!path) return;
           var len = path.getTotalLength ? path.getTotalLength() : 1000;
           path.style.strokeDasharray  = len + ' ' + len;
           path.style.strokeDashoffset = len;
           requestAnimationFrame(function () {
-            path.style.transition = 'stroke-dashoffset 1200ms ease-out';
+            path.style.transition = 'stroke-dashoffset 900ms ease-out';
             path.style.strokeDashoffset = '0';
           });
         });
       }
     }
 
-    function clearPolyline() {
-      if (!activePolyline) return;
-      var poly = activePolyline;
-      activePolyline = null;
-      if (!reduced) {
-        var path = poly._path;
-        if (path) {
-          path.style.transition = 'opacity 200ms ease-out';
-          path.style.opacity = '0';
-          setTimeout(function () { try { poly.remove(); } catch(e){} }, 200);
-          return;
-        }
-      }
-      try { poly.remove(); } catch(e) {}
+    function endpointLabel(latlng, text, color) {
+      return L.marker(latlng, {
+        interactive: false, keyboard: false, zIndexOffset: 700,
+        icon: L.divIcon({
+          className: '', iconSize: [0, 0], iconAnchor: [0, 0],
+          html: '<div style="transform:translate(-50%,-52px);white-space:nowrap;' +
+            'background:#FFFFFF;color:#1C1A17;border:1.5px solid ' + color + ';' +
+            'font:700 9px/1 Inter,sans-serif;letter-spacing:0.07em;text-transform:uppercase;' +
+            'padding:4px 8px;border-radius:9999px;box-shadow:0 2px 8px rgba(0,0,0,0.28);">' +
+            text + '</div>'
+        })
+      }).addTo(map);
+    }
+
+    /* Remove the whole route synchronously — no fade — so switching days
+       never leaves two days' lines overlapping. */
+    function clearRoute() {
+      routeLayers.forEach(function (l) { try { map.removeLayer(l); } catch (e) {} });
+      routeLayers = [];
     }
 
     /* ──────────────────────────────────────────────
@@ -1624,6 +1924,8 @@
         '<a href="index.html" class="empty-state-btn">← Start Planning</a>' +
         '</div>';
       document.getElementById('map-legend').style.display = 'none';
+      var dt = document.getElementById('day-tabs');
+      if (dt) dt.style.display = 'none';
       if (map) map.setView([20, 0], 2);
     }
 
@@ -1662,43 +1964,67 @@
        MOCK DATA (demo mode: ?demo=1)
     ────────────────────────────────────────────── */
     function mockData() {
+      var VID = { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'Mumbiker Nikhil\'s Jaipur Vlog' };
       return {
         destination: 'Jaipur, India',
-        total_places: 7,
+        total_places: 9,
         video_titles: ['Mumbiker Nikhil\'s Jaipur Vlog'],
+        warnings: ['Chand Baori is ~95 km from the city — moved to More to Explore as it needs a dedicated day trip.'],
         clusters: [
           {
             day_number: 1, date_label: 'Day 1', theme_label: 'Old City & Forts',
+            notes: 'A tight loop through the walled city — all stops are within a few km of each other.',
             places: [
+              { name: 'Rawat Mishtan Bhandar', lat: 26.9196, lng: 75.7878, category: 'food', source: 'suggested',
+                meal_type: 'breakfast', time_of_day: 'Morning',
+                description: 'Legendary spot for pyaaz kachori and lassi — a classic Jaipur breakfast.' },
               { name: 'Amber Fort', lat: 26.9855, lng: 75.8513, category: 'Historic Fort', rating: 4.7,
+                time_of_day: 'Morning', source: 'video',
                 description: 'Magnificent 16th-century hilltop fort with ornate palace complex and sweeping views over Maota Lake.',
-                source_videos: [{ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'Mumbiker Nikhil\'s Jaipur Vlog' }] },
+                source_videos: [VID] },
+              { name: '1135 AD', lat: 26.9852, lng: 75.8508, category: 'food', source: 'suggested',
+                meal_type: 'lunch', time_of_day: 'Afternoon',
+                description: 'Royal-themed fine dining inside Amber Fort — convenient lunch right where you are.' },
               { name: 'Hawa Mahal', lat: 26.9239, lng: 75.8267, category: 'Palace', rating: 4.5,
-                description: 'Iconic five-storey pink sandstone palace with 953 small windows designed for royal ladies to observe street life.',
-                source_videos: [{ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'Mumbiker Nikhil\'s Jaipur Vlog' }] },
+                time_of_day: 'Afternoon', source: 'video',
+                description: 'Iconic five-storey pink sandstone palace with 953 small windows for royal ladies to observe street life.',
+                source_videos: [VID] },
               { name: 'City Palace', lat: 26.9258, lng: 75.8237, category: 'Palace', rating: 4.6,
+                time_of_day: 'Afternoon', source: 'video',
                 description: 'Opulent royal residence and museum complex displaying weapons, textiles, and fine art collections.',
-                source_videos: [{ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'Mumbiker Nikhil\'s Jaipur Vlog' }] }
+                source_videos: [VID] },
+              { name: 'Spice Court', lat: 26.9133, lng: 75.8086, category: 'food', source: 'suggested',
+                meal_type: 'dinner', time_of_day: 'Evening',
+                description: 'Well-loved Rajasthani & Mughlai dinner spot a short ride from the old city.' }
             ]
           },
           {
             day_number: 2, date_label: 'Day 2', theme_label: 'Bazaars & Temples',
+            notes: 'A relaxed day around the central markets and museums.',
             places: [
+              { name: 'Tapri Central', lat: 26.8989, lng: 75.8083, category: 'food', source: 'suggested',
+                meal_type: 'breakfast', time_of_day: 'Morning',
+                description: 'Rooftop cafe famed for chai and breakfast overlooking Central Park.' },
               { name: 'Johri Bazaar', lat: 26.9183, lng: 75.8231, category: 'Market', rating: 4.3,
+                time_of_day: 'Morning', source: 'video',
                 description: 'Jaipur\'s oldest jewelry market famed for bangles, gems, traditional crafts and street food.',
-                source_videos: [{ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'Mumbiker Nikhil\'s Jaipur Vlog' }] },
-              { name: 'Birla Mandir', lat: 26.8996, lng: 75.8187, category: 'Temple', rating: 4.5,
-                description: 'Beautiful modern marble temple dedicated to Lakshmi Narayan, built by the Birla Group in 1988.',
-                source_videos: [{ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'Mumbiker Nikhil\'s Jaipur Vlog' }] },
+                source_videos: [VID] },
               { name: 'Albert Hall Museum', lat: 26.9023, lng: 75.8143, category: 'Museum', rating: 4.4,
+                time_of_day: 'Afternoon', source: 'video',
                 description: 'Oldest museum of Rajasthan housed in a stunning Indo-Saracenic building, showcasing art and history.',
-                source_videos: [{ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'Mumbiker Nikhil\'s Jaipur Vlog' }] }
+                source_videos: [VID] },
+              { name: 'Birla Mandir', lat: 26.8996, lng: 75.8187, category: 'Temple', rating: 4.5,
+                time_of_day: 'Evening', source: 'video',
+                description: 'Beautiful modern marble temple dedicated to Lakshmi Narayan, built by the Birla Group in 1988.',
+                source_videos: [VID] }
             ]
           }
         ],
         more_to_explore: [
-          { name: 'Jantar Mantar', lat: 26.9246, lng: 75.8243, category: 'Observatory', rating: 4.4,
-            source_videos: [{ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', title: 'Mumbiker Nikhil\'s Jaipur Vlog' }] }
+          { name: 'Jantar Mantar', lat: 26.9246, lng: 75.8243, category: 'Observatory', rating: 4.4, source: 'video',
+            source_videos: [VID] },
+          { name: 'Chand Baori', lat: 27.0078, lng: 76.6065, category: 'Stepwell', source: 'suggested',
+            description: 'Spectacular 9th-century stepwell in Abhaneri — a popular day trip from Jaipur.' }
         ],
         unresolved_places: [],
         hotel: { name: 'Rambagh Palace', lat: 26.8974, lng: 75.8095 }

@@ -15,12 +15,13 @@ extract all specific named places mentioned.
 Return ONLY a valid JSON object — no explanation, no markdown:
 {
   "places": [
-    {"name": "Place Name", "sentiment": "positive"|"neutral"|"negative", "context": "one brief phrase"}
+    {"name": "Place Name", "category": "attraction"|"food"|"market"|"viewpoint"|"museum"|"temple"|"beach"|"neighbourhood"|"other", "sentiment": "positive"|"neutral"|"negative", "context": "one brief phrase"}
   ]
 }
 
 Rules:
 - Extract specific named places only: restaurants, cafes, attractions, neighbourhoods, markets, viewpoints, hotels, temples, museums, beaches, etc.
+- Set "category" to the best-fit type. Use "food" for any restaurant, cafe, bakery, street-food spot, bar, or eatery — this matters for meal planning.
 - Skip vague references like "a nice restaurant", "some street", "a local spot"
 - Skip the destination city or country itself unless it names a very specific district/area
 - Negative-sentiment places are kept in output (caller will filter them)

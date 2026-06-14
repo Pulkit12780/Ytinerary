@@ -502,6 +502,33 @@
     .sparkle-char { position: absolute; top: -6px; right: -4px; font-size: 14px; color: var(--sparkle); pointer-events: none; line-height: 1; }
     @media (prefers-reduced-motion: no-preference) { .sparkle-char { animation: sparkle-anim 800ms ease-out forwards; } }
 
+    /* ── TRIP TYPE CHOOSER ──────────────────────────────── */
+    .trip-type-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px;
+    }
+    .trip-chip { position: relative; display: flex; }
+    .trip-chip input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+    .trip-chip-label {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+      width: 100%; padding: 12px 13px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 13px;
+      cursor: pointer;
+      transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 120ms ease;
+    }
+    .trip-chip-label:hover { border-color: #D6CFC2; transform: translateY(-1px); }
+    .trip-chip-emoji { font-size: 19px; line-height: 1; margin-bottom: 1px; }
+    .trip-chip-title { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
+    .trip-chip-desc  { font-size: 11.5px; color: var(--text-muted); line-height: 1.3; }
+    .trip-chip input:checked + .trip-chip-label {
+      border-color: var(--clay); background: var(--clay-soft); box-shadow: var(--sh-focus);
+    }
+    .trip-chip input:checked + .trip-chip-label .trip-chip-title { color: var(--clay-hover); }
+    .trip-chip input:focus-visible + .trip-chip-label { box-shadow: var(--sh-focus); }
+    @media (max-width: 480px) { .trip-type-grid { grid-template-columns: repeat(2, 1fr); } }
+
+    /* "Have videos in mind?" sub-block inside the optional details */
+    .optional-content .paste-videos-block { margin-bottom: 2px; }
+
     /* ── HOW IT WORKS ───────────────────────────────────── */
     .how-section {
       position: relative; z-index: 2;
@@ -724,7 +751,7 @@
     <div class="plan-intro reveal">
       <span class="eyebrow">Plan your trip</span>
       <h2 class="section-h2" id="plan-heading">Build your itinerary</h2>
-      <p class="plan-sub">One URL. About a minute. A complete day-by-day plan you can share.</p>
+      <p class="plan-sub">Tell us where you're going and the kind of trip you want — we'll find the videos and build a day-by-day plan you can share.</p>
     </div>
 
     <main>
@@ -757,22 +784,78 @@
 
             <hr class="form-divider" aria-hidden="true">
 
-            <!-- 2. YouTube URLs -->
+            <!-- 2. Trip type -->
             <div class="form-section">
-              <label class="field-label" id="youtube-urls-label">
-                YouTube videos <span class="required-star" aria-hidden="true">*</span>
-              </label>
-              <p class="field-helper" style="margin-bottom:10px">Paste one or more YouTube video URLs</p>
-              <div class="url-row-wrapper" id="url-row-wrapper" role="list" aria-labelledby="youtube-urls-label"></div>
-              <button type="button" class="add-video-btn" id="add-video-btn" aria-label="Add another YouTube video URL">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                Add another video
-              </button>
+              <label class="field-label" id="trip-type-label">What kind of trip?</label>
+              <p class="field-helper" style="margin-bottom:10px">We'll tailor which places we suggest and the daily pace.</p>
+              <div class="trip-type-grid" role="radiogroup" aria-labelledby="trip-type-label">
+                <label class="trip-chip">
+                  <input type="radio" name="trip_type" value="balanced" checked>
+                  <span class="trip-chip-label">
+                    <span class="trip-chip-emoji" aria-hidden="true">🧭</span>
+                    <span class="trip-chip-title">Balanced</span>
+                    <span class="trip-chip-desc">First visit</span>
+                  </span>
+                </label>
+                <label class="trip-chip">
+                  <input type="radio" name="trip_type" value="romantic">
+                  <span class="trip-chip-label">
+                    <span class="trip-chip-emoji" aria-hidden="true">💞</span>
+                    <span class="trip-chip-title">Romantic</span>
+                    <span class="trip-chip-desc">Couples</span>
+                  </span>
+                </label>
+                <label class="trip-chip">
+                  <input type="radio" name="trip_type" value="family">
+                  <span class="trip-chip-label">
+                    <span class="trip-chip-emoji" aria-hidden="true">👨‍👩‍👧</span>
+                    <span class="trip-chip-title">Family</span>
+                    <span class="trip-chip-desc">With kids</span>
+                  </span>
+                </label>
+                <label class="trip-chip">
+                  <input type="radio" name="trip_type" value="adventure">
+                  <span class="trip-chip-label">
+                    <span class="trip-chip-emoji" aria-hidden="true">🥾</span>
+                    <span class="trip-chip-title">Adventure</span>
+                    <span class="trip-chip-desc">& outdoors</span>
+                  </span>
+                </label>
+                <label class="trip-chip">
+                  <input type="radio" name="trip_type" value="nature">
+                  <span class="trip-chip-label">
+                    <span class="trip-chip-emoji" aria-hidden="true">🌿</span>
+                    <span class="trip-chip-title">Nature</span>
+                    <span class="trip-chip-desc">& slow</span>
+                  </span>
+                </label>
+                <label class="trip-chip">
+                  <input type="radio" name="trip_type" value="culture">
+                  <span class="trip-chip-label">
+                    <span class="trip-chip-emoji" aria-hidden="true">🏛️</span>
+                    <span class="trip-chip-title">Culture</span>
+                    <span class="trip-chip-desc">& heritage</span>
+                  </span>
+                </label>
+              </div>
             </div>
 
             <hr class="form-divider" aria-hidden="true">
 
-            <!-- 3. Optional Fields -->
+            <!-- 3. Notes -->
+            <div class="form-section">
+              <label class="field-label" for="trip-notes">
+                Anything we should know? <span style="color:var(--text-muted);font-weight:500">(optional)</span>
+              </label>
+              <textarea id="trip-notes" class="input-base" rows="2" maxlength="500"
+                        placeholder="e.g. travelling with toddlers, love street food, want a relaxed pace"
+                        aria-describedby="notes-helper"></textarea>
+              <p id="notes-helper" class="field-helper">We'll respect this when choosing places and pacing your days.</p>
+            </div>
+
+            <hr class="form-divider" aria-hidden="true">
+
+            <!-- 4. Optional details (videos + extras) -->
             <div class="form-section">
               <details class="optional-details" id="optional-details">
                 <summary class="optional-summary">
@@ -782,6 +865,15 @@
                   </span>
                 </summary>
                 <div class="optional-content">
+                  <div class="paste-videos-block">
+                    <label class="field-label" id="youtube-urls-label">Have videos in mind? Paste them</label>
+                    <p class="field-helper" style="margin-bottom:10px">Optional — leave blank and we'll find great travel videos for you. Pasted links take precedence.</p>
+                    <div class="url-row-wrapper" id="url-row-wrapper" role="list" aria-labelledby="youtube-urls-label"></div>
+                    <button type="button" class="add-video-btn" id="add-video-btn" aria-label="Add another YouTube video URL">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                      Add another video
+                    </button>
+                  </div>
                   <div>
                     <label class="field-label" for="hotel-name">Hotel (optional)</label>
                     <div class="input-wrap-with-icon">
@@ -1212,10 +1304,10 @@
     var sparkleRemoved  = false;
 
     function isFormComplete() {
-      var dest     = document.getElementById('destination').value.trim();
-      var hasYtUrl = Array.from(document.querySelectorAll('.url-input'))
-                         .some(function (i) { return isYouTubeUrl(i.value.trim()); });
-      return dest.length >= 2 && hasYtUrl;
+      /* Destination is the only requirement now — videos are auto-sourced when none
+         are pasted (intent-first reframe). */
+      var dest = document.getElementById('destination').value.trim();
+      return dest.length >= 2;
     }
 
     function checkFormValidity() {
@@ -1288,8 +1380,12 @@
         var youtubeUrls = Array.from(document.querySelectorAll('.url-input'))
           .map(function (i)  { return i.value.trim(); })
           .filter(function (v) { return v && isYouTubeUrl(v); });
-        if (!destination || youtubeUrls.length === 0) return;
+        if (!destination) return;          // URLs optional now — auto-sourced when empty
         if (!validateDestination()) return;
+
+        var tripTypeEl = document.querySelector('input[name="trip_type"]:checked');
+        var tripType   = tripTypeEl ? tripTypeEl.value : 'balanced';
+        var notes      = ((document.getElementById('trip-notes') || {}).value || '').trim();
 
         var hotel     = (document.getElementById('hotel-name')  || {}).value || '';
         var startDate = (document.getElementById('date-start')  || {}).value || '';
@@ -1303,7 +1399,9 @@
         showLoadingOverlay();
         runPipeline({
           destination:  destination,
-          youtube_urls: youtubeUrls,
+          trip_type:    tripType,
+          notes:        notes || undefined,
+          youtube_urls: youtubeUrls,       // may be empty; backend auto-sources
           hotel:        hotel     || undefined,
           start_date:   startDate || undefined,
           end_date:     endDate   || undefined,
@@ -1388,20 +1486,33 @@
           window.location.href = 'results.html';
         }, 600);
       } else if (type === 'error' || data.type === 'error') {
-        showPipelineError(data.message || 'Something went wrong. Please try again.');
+        if (data.code === 'NO_VIDEOS_FOUND' || data.code === 'MISSING_TRANSCRIPT') {
+          showPipelineError(
+            "We couldn't find good travel videos for this trip. Paste a YouTube link or two below and we'll build from those.",
+            false, true /* nudge paste fallback */
+          );
+        } else {
+          showPipelineError(data.message || 'Something went wrong. Please try again.');
+        }
       }
     }
 
     /* ── Pipeline error state (shown inside the overlay) ── */
-    function showPipelineError(msg, showDemoLink) {
+    var pendingPasteNudge = false;
+
+    function showPipelineError(msg, showDemoLink, nudgePaste) {
       if (pipelineAbortCtrl) { pipelineAbortCtrl.abort(); pipelineAbortCtrl = null; }
       clearLoadingNoteTimers();
       setButtonLoading(false);
+      pendingPasteNudge = !!nudgePaste;
 
       var overlay = document.getElementById('loading-overlay');
       overlay.classList.add('visible', 'card-ready');
-      document.querySelector('.loading-heading').textContent = 'Couldn\'t build your itinerary';
+      document.querySelector('.loading-heading').textContent =
+        nudgePaste ? 'No videos found yet' : 'Couldn\'t build your itinerary';
       setLoadingNote(msg, true);
+      document.getElementById('loading-dismiss').textContent =
+        nudgePaste ? 'Paste a video link' : 'Close';
       document.getElementById('loading-actions').classList.add('visible');
       document.getElementById('loading-demo-link').classList.toggle('visible', !!showDemoLink);
       document.getElementById('loading-dismiss').focus();
@@ -1410,21 +1521,39 @@
     function resetLoadingCard() {
       document.querySelector('.loading-heading').textContent = 'Building your itinerary...';
       setLoadingNote('This takes about 30–90 seconds.');
+      document.getElementById('loading-dismiss').textContent = 'Close';
       document.getElementById('loading-actions').classList.remove('visible');
       document.getElementById('loading-demo-link').classList.remove('visible');
     }
 
+    /* Reveal the collapsed "Have videos in mind?" block and focus its first input. */
+    function openPasteFallback() {
+      var details = document.getElementById('optional-details');
+      if (details) details.open = true;
+      var firstUrl = document.querySelector('.url-input');
+      if (firstUrl) {
+        firstUrl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(function () { firstUrl.focus(); }, 300);
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('loading-dismiss').addEventListener('click', function () {
+        var nudge = pendingPasteNudge;
+        pendingPasteNudge = false;
         hideLoadingOverlay();
         setTimeout(resetLoadingCard, 500);
+        if (nudge) setTimeout(openPasteFallback, 520);
       });
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' &&
             document.getElementById('loading-actions').classList.contains('visible') &&
             document.getElementById('loading-overlay').classList.contains('visible')) {
+          var nudge = pendingPasteNudge;
+          pendingPasteNudge = false;
           hideLoadingOverlay();
           setTimeout(resetLoadingCard, 500);
+          if (nudge) setTimeout(openPasteFallback, 520);
         }
       });
     });

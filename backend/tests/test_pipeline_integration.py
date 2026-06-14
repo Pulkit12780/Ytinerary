@@ -1,0 +1,142 @@
+"""F3 — pipeline integration with all network-touching agents mocked.
+
+Covers:
+  - AC #3: a zero-URL request reaches a real plan (auto-sourced).
+  - AC #5: pasted URLs take precedence over auto-sourcing.
+  - ADR-002: an auto-sourced over-fetch keeps only transcript-available videos.
+"""
+import asyncio
+
+import pytest
+
+from backend import pipeline, metrics
+from backend.models import PlanRequest
+
+
+# ── Fakes ────────────────────────────────────────────────────────────────────
+
+
+class _FakeSource:
+    """Records calls and returns a fixed set of ranked candidates."""
+    def __init__(self, n=8):
+        self.calls = 0
+        self._n = n
+
+    async def search(self, destination, trip_type="balanced", limit=8):
+        self.calls += 1
+        return [
+            {"url": f"https://www.youtube.com/watch?v=vid{i:08d}",
+             "title": f"Video {i}", "video_id": f"vid{i:08d}", "score": float(8 - i)}
+            for i in range(self._n)
+        ][:limit]
+
+
+def _install_fakes(monkeypatch, *, source, transcripts_without=()):
+    """Patch every agent that would hit the network with deterministic stubs."""
+    monkeypatch.setattr(pipeline, "_video_source", source)
+
+    async def fake_fetch_transcript(url):
+        vid = url.rsplit("=", 1)[-1].rsplit("/", 1)[-1]
+        has = vid not in transcripts_without
+        return {"url": url, "video_id": vid, "title": f"Title {vid}",
+                "transcript": f"We visited Place {vid}." if has else None,
+                "error": None if has else "no_transcript"}
+    monkeypatch.setattr(pipeline.transcript_agent, "fetch_transcript", fake_fetch_transcript)
+
+    async def fake_extract(transcript, destination, title=""):
+        # one place per video, named after the transcript
+        name = transcript.replace("We visited ", "").rstrip(".")
+        return [{"name": name, "sentiment": "positive", "category": "attraction"}]
+    monkeypatch.setattr(pipeline.extractor_agent, "extract_places", fake_extract)
+
+    async def fake_augment(*a, **k):
+        return {"attractions": [], "restaurants": []}
+    monkeypatch.setattr(pipeline.augmenter_agent, "augment_places", fake_augment)
+
+    async def fake_geocode(raw, destination):
+        enriched = []
+        for i, p in enumerate(raw):
+            q = dict(p)
+            q["lat"] = 26.91 + i * 0.001
+            q["lng"] = 75.79 + i * 0.001
+            enriched.append(q)
+        return enriched, []
+    monkeypatch.setattr(pipeline.geocoder_agent, "geocode_places", fake_geocode)
+
+    # Force the judge's deterministic fallback (no LLM/network).
+    async def fake_llm_plan(*a, **k):
+        return None
+    monkeypatch.setattr(pipeline.judge_agent, "_llm_plan", fake_llm_plan)
+
+
+@pytest.fixture(autouse=True)
+def _reset_metrics():
+    metrics.reset()
+    yield
+    metrics.reset()
+
+
+# ── Tests ────────────────────────────────────────────────────────────────────
+
+
+def test_zero_url_request_reaches_a_plan(monkeypatch):
+    src = _FakeSource(n=8)
+    _install_fakes(monkeypatch, source=src)
+
+    resp = asyncio.run(pipeline.run(PlanRequest(destination="Jaipur", trip_type="balanced")))
+
+    assert src.calls == 1                     # auto-sourcing happened
+    assert resp.total_places > 0              # a real plan came out
+    assert resp.clusters                      # at least one day
+    # metrics recorded a zero-URL, auto-sourced success
+    snap = metrics.snapshot()
+    assert snap["counters"]["zero_url_sessions"] == 1
+    assert snap["counters"]["auto_sourced_ok"] == 1
+    assert snap["counters"]["plans_succeeded"] == 1
+
+
+def test_manual_urls_take_precedence(monkeypatch):
+    src = _FakeSource(n=8)
+    _install_fakes(monkeypatch, source=src)
+
+    resp = asyncio.run(pipeline.run(PlanRequest(
+        destination="Jaipur",
+        youtube_urls=["https://www.youtube.com/watch?v=manual00001"],
+    )))
+
+    assert src.calls == 0                      # auto-sourcing skipped
+    titles = " ".join(resp.video_titles)
+    assert "manual00001" in titles             # built from the pasted URL
+    # manual session is not a zero-URL session
+    assert metrics.snapshot()["counters"]["zero_url_sessions"] == 0
+
+
+def test_overfetch_keeps_only_transcript_available(monkeypatch):
+    # 8 sourced, 3 have no transcript → keep first 5 transcript-yielding (B5).
+    src = _FakeSource(n=8)
+    _install_fakes(
+        monkeypatch, source=src,
+        transcripts_without=("vid00000001", "vid00000003", "vid00000005"),
+    )
+
+    resp = asyncio.run(pipeline.run(PlanRequest(destination="Jaipur")))
+
+    # 5 kept, all transcript-available; the 3 dead ones excluded.
+    assert len(resp.video_titles) == 5
+    for dead in ("vid00000001", "vid00000003", "vid00000005"):
+        assert dead not in " ".join(resp.video_titles)
+
+
+def test_no_videos_found_raises_and_is_metered(monkeypatch):
+    class _Empty:
+        async def search(self, *a, **k):
+            return []
+    _install_fakes(monkeypatch, source=_Empty())
+
+    with pytest.raises(pipeline.PipelineError) as exc:
+        asyncio.run(pipeline.run(PlanRequest(destination="Atlantis")))
+    assert exc.value.code == "NO_VIDEOS_FOUND"
+
+    snap = metrics.snapshot()
+    assert snap["counters"]["no_videos_found"] == 1
+    assert snap["counters"]["plans_failed"] == 1

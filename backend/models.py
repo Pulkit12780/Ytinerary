@@ -1,11 +1,36 @@
 from __future__ import annotations
 from pydantic import BaseModel, field_validator
-from typing import Optional
+from typing import Literal, Optional
+
+
+# ── Trip-type taxonomy (single source of truth — dev plan §2) ────────────────
+# Shared by request validation, the sourcer query builder, and the intent prompts.
+
+TripType = Literal["balanced", "romantic", "family", "adventure", "nature", "culture"]
+
+TRIP_TYPES: tuple[TripType, ...] = (
+    "balanced", "romantic", "family", "adventure", "nature", "culture",
+)
+
+# Search-query modifier per trip type. Appended to the base "<destination> ...
+# travel vlog" query the sourcer builds. "balanced" adds nothing (current behavior).
+TRIP_TYPE_SEARCH_MODIFIERS: dict[str, str] = {
+    "balanced": "",
+    "romantic": "honeymoon couples",
+    "family": "with kids family",
+    "adventure": "trekking adventure",
+    "nature": "nature slow travel",
+    "culture": "heritage culture history",
+}
+
+NOTES_MAX_LEN = 500
 
 
 class PlanRequest(BaseModel):
     destination: str
-    youtube_urls: list[str]
+    trip_type: TripType = "balanced"   # default preserves current behavior
+    notes: Optional[str] = None        # free text, capped at NOTES_MAX_LEN
+    youtube_urls: list[str] = []       # optional — auto-sourced when empty
     hotel: Optional[str] = None
     start_date: Optional[str] = None  # ISO YYYY-MM-DD
     end_date: Optional[str] = None    # ISO YYYY-MM-DD
@@ -19,11 +44,20 @@ class PlanRequest(BaseModel):
             raise ValueError("destination cannot be empty")
         return v
 
+    @field_validator("notes")
+    @classmethod
+    def cap_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        return v[:NOTES_MAX_LEN]
+
     @field_validator("youtube_urls")
     @classmethod
-    def one_to_five_urls(cls, v: list[str]) -> list[str]:
-        if not v:
-            raise ValueError("at least one YouTube URL is required")
+    def at_most_five_urls(cls, v: list[str]) -> list[str]:
+        # Empty is valid now (auto-sourcing handles it). Cap manual input at 5.
         if len(v) > 5:
             raise ValueError("a maximum of 5 YouTube URLs is allowed")
         return v
@@ -45,6 +79,10 @@ class Place(BaseModel):
     photo_url: Optional[str] = None
     place_id: Optional[str] = None
     source_videos: list[SourceVideo] = []
+    # Itinerary semantics added by the augmenter / judge
+    meal_type: Optional[str] = None    # "breakfast" | "lunch" | "dinner" | None (attraction)
+    source: str = "video"              # "video" | "suggested"
+    time_of_day: Optional[str] = None  # "Morning" | "Afternoon" | "Evening" — display ordering
 
 
 class DayCluster(BaseModel):
@@ -52,6 +90,7 @@ class DayCluster(BaseModel):
     date_label: str   # "Day 1" or "Monday, May 20"
     theme_label: str  # e.g. "Old City & Bazaars"
     places: list[Place]
+    notes: Optional[str] = None  # judge's one-line rationale for the day
 
 
 class HotelPin(BaseModel):
@@ -68,9 +107,10 @@ class PlanResponse(BaseModel):
     hotel: Optional[HotelPin] = None
     total_places: int
     video_titles: list[str] = []
+    warnings: list[str] = []  # feasibility flags, e.g. "X is 40 km out — moved to More to Explore"
 
 
 class ErrorResponse(BaseModel):
     error: str
-    code: str   # ZERO_PLACES | MISSING_TRANSCRIPT | GEOCODING_FAILURE | INVALID_DESTINATION
+    code: str   # ZERO_PLACES | MISSING_TRANSCRIPT | GEOCODING_FAILURE | INVALID_DESTINATION | NO_VIDEOS_FOUND
     detail: Optional[str] = None

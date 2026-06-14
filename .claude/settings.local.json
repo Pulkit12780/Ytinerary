@@ -8,7 +8,8 @@
       "Bash(uvicorn backend.main:app --port 8000)",
       "Bash(curl -s -X POST http://localhost:8000/plan -H 'Content-Type: application/json' -d '{\"destination\":\"Jaipur, India\",\"youtube_urls\":[\"https://www.youtube.com/watch?v=VC7_2HHZ3RM\"]}')",
       "Bash(pkill -f \"uvicorn\")",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(open -a \"Google Chrome\" \"file:///Users/pulkit/Documents/Product%20Portfolio/Ytinerary/results.html?demo=1\")"
     ]
   }
 }
