@@ -9,24 +9,34 @@ _client: OpenAI | None = None
 _MODEL = "gpt-4o-mini"
 
 _SYSTEM = """\
-You are a travel place extractor. Given a YouTube travel video transcript and a destination, \
-extract all specific named places mentioned.
+You are a travel place extractor. Given a YouTube travel video transcript (or its \
+description, which may be promotional) and a destination, extract only the specific, \
+*visitable* places a traveler would actually go to.
 
 Return ONLY a valid JSON object — no explanation, no markdown:
 {
   "places": [
-    {"name": "Place Name", "category": "attraction"|"food"|"market"|"viewpoint"|"museum"|"temple"|"beach"|"neighbourhood"|"other", "sentiment": "positive"|"neutral"|"negative", "context": "one brief phrase"}
+    {"name": "Place Name", "category": "attraction"|"food"|"market"|"viewpoint"|"museum"|"temple"|"beach"|"neighbourhood"|"park"|"nature"|"other", "scope": "poi"|"district"|"town"|"region", "sentiment": "positive"|"neutral"|"negative", "context": "one brief phrase"}
   ]
 }
 
 Rules:
-- Extract specific named places only: restaurants, cafes, attractions, neighbourhoods, markets, viewpoints, hotels, temples, museums, beaches, etc.
-- Set "category" to the best-fit type. Use "food" for any restaurant, cafe, bakery, street-food spot, bar, or eatery — this matters for meal planning.
-- Skip vague references like "a nice restaurant", "some street", "a local spot"
-- Skip the destination city or country itself unless it names a very specific district/area
-- Negative-sentiment places are kept in output (caller will filter them)
-- Each place name should be the common English name, not a translation
-- Deduplicate: if a place is mentioned several times, include it once
+- Extract specific named places a traveler visits for enjoyment: restaurants, cafes,
+  attractions, neighbourhoods, markets, viewpoints, temples, museums, beaches, parks,
+  nature spots, landmarks.
+- Use "food" for any restaurant, cafe, bakery, street-food spot, bar or eatery — this
+  matters for meal planning.
+- NEVER extract: airports, ports/harbours, bus or train stations, government or
+  administrative offices, hospitals, banks, hotels-as-sights, residential areas,
+  business parks, or the creator's own shop/brand/sponsor mentioned in the video.
+- Skip vague references ("a nice restaurant", "some street", "a local spot").
+- Set "scope": "poi" for a single visitable spot; "district" for a neighbourhood/area;
+  "town" for a whole town/city; "region" for a province/island/country. A town or region
+  is NOT a stop on its own — only extract it if it's clearly named as a place to base in.
+- Skip the destination itself (the searched city/country) unless it names a specific
+  district within it.
+- Negative-sentiment places are kept in output (caller will filter them).
+- Use the common English name, not a translation. Deduplicate repeated mentions.
 """
 
 _MAX_TRANSCRIPT = 10_000  # characters sent to the model

@@ -1,6 +1,6 @@
 # Development Plan — Trip Intent & Auto-Sourcing
 
-**Author:** CTO · **Date:** 2026-06-14 · **Status:** Ready to build
+**Author:** CTO · **Date:** 2026-06-14 · **Status:** Shipped — M1–M4 complete (2026-06-14)
 **Source brief:** [`docs/product/brief-intent-and-autosourcing.md`](../product/brief-intent-and-autosourcing.md) (CPO, 2026-06-14)
 
 ---

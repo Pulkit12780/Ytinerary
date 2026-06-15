@@ -95,7 +95,9 @@ def test_zero_url_request_reaches_a_plan(monkeypatch):
     assert snap["counters"]["plans_succeeded"] == 1
 
 
-def test_manual_urls_take_precedence(monkeypatch):
+def test_thin_manual_paste_is_topped_up_to_minimum(monkeypatch):
+    # A single pasted URL is kept and PRIORITIZED, but topped up with auto-sourced
+    # videos so the plan draws on at least _MIN_VIDEOS creators.
     src = _FakeSource(n=8)
     _install_fakes(monkeypatch, source=src)
 
@@ -104,11 +106,24 @@ def test_manual_urls_take_precedence(monkeypatch):
         youtube_urls=["https://www.youtube.com/watch?v=manual00001"],
     )))
 
-    assert src.calls == 0                      # auto-sourcing skipped
+    assert src.calls == 1                       # auto-sourcing ran to top up
     titles = " ".join(resp.video_titles)
-    assert "manual00001" in titles             # built from the pasted URL
-    # manual session is not a zero-URL session
+    assert "manual00001" in titles              # the pasted link is kept
+    assert len(resp.video_titles) == pipeline._MIN_VIDEOS  # topped up to the minimum
+    # still a manual (not zero-URL) session
     assert metrics.snapshot()["counters"]["zero_url_sessions"] == 0
+
+
+def test_rich_manual_paste_is_not_topped_up(monkeypatch):
+    # Five+ pasted URLs are already rich — auto-sourcing is skipped entirely.
+    src = _FakeSource(n=8)
+    _install_fakes(monkeypatch, source=src)
+
+    urls = [f"https://www.youtube.com/watch?v=manual{i:05d}" for i in range(5)]
+    resp = asyncio.run(pipeline.run(PlanRequest(destination="Jaipur", youtube_urls=urls)))
+
+    assert src.calls == 0                       # no top-up needed
+    assert len(resp.video_titles) == 5
 
 
 def test_overfetch_keeps_only_transcript_available(monkeypatch):
@@ -127,16 +142,42 @@ def test_overfetch_keeps_only_transcript_available(monkeypatch):
         assert dead not in " ".join(resp.video_titles)
 
 
-def test_no_videos_found_raises_and_is_metered(monkeypatch):
+def test_no_videos_falls_through_to_curator(monkeypatch):
+    """Videos are optional now: when auto-sourcing finds nothing, the travel-expert
+    curator still produces a plan instead of the pipeline hard-failing."""
     class _Empty:
         async def search(self, *a, **k):
             return []
     _install_fakes(monkeypatch, source=_Empty())
 
+    # Curator returns real places even with zero videos.
+    async def curator_with_places(*a, **k):
+        return {
+            "attractions": [{"name": "Hawa Mahal", "category": "sight",
+                             "importance": "must_see", "source": "suggested",
+                             "source_videos": []}],
+            "restaurants": [{"name": "LMB", "category": "food", "meal_type": "lunch",
+                             "source": "suggested", "source_videos": []}],
+        }
+    monkeypatch.setattr(pipeline.augmenter_agent, "augment_places", curator_with_places)
+
+    resp = asyncio.run(pipeline.run(PlanRequest(destination="Jaipur")))
+
+    assert resp.total_places > 0          # a real plan from curated research alone
+    assert not resp.video_titles          # built without any videos
+    assert any("research" in w.lower() for w in resp.warnings)  # soft note surfaced
+    assert metrics.snapshot()["counters"]["plans_succeeded"] == 1
+
+
+def test_zero_places_when_nothing_found(monkeypatch):
+    """No videos AND an empty curator → the only genuine dead end: ZERO_PLACES."""
+    class _Empty:
+        async def search(self, *a, **k):
+            return []
+    _install_fakes(monkeypatch, source=_Empty())  # _install_fakes' curator returns empty
+
     with pytest.raises(pipeline.PipelineError) as exc:
         asyncio.run(pipeline.run(PlanRequest(destination="Atlantis")))
-    assert exc.value.code == "NO_VIDEOS_FOUND"
+    assert exc.value.code == "ZERO_PLACES"
 
-    snap = metrics.snapshot()
-    assert snap["counters"]["no_videos_found"] == 1
-    assert snap["counters"]["plans_failed"] == 1
+    assert metrics.snapshot()["counters"]["plans_failed"] == 1

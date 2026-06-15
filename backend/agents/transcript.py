@@ -1,9 +1,40 @@
 """Fetch YouTube transcripts via youtube-transcript-api with yt-dlp fallback."""
 from __future__ import annotations
+import os
 import re
 import asyncio
 import httpx
 from .. import cache
+
+
+# Webshare residential proxy — YouTube IP-blocks server-side transcript fetching,
+# so route requests through a residential proxy when creds are present in .env.
+# Absent creds => no proxy (direct, works locally until the IP is rate-limited).
+# Read lazily at call time: this module is imported before load_dotenv() runs.
+def _webshare_creds() -> tuple[str, str] | None:
+    user = os.environ.get("WEBSHARE_USER") or os.environ.get("WEBSHARE_PROXY_USERNAME")
+    pwd = os.environ.get("WEBSHARE_PASS") or os.environ.get("WEBSHARE_PROXY_PASSWORD")
+    return (user, pwd) if (user and pwd) else None
+
+
+def _webshare_proxy_config():
+    """WebshareProxyConfig for youtube-transcript-api, or None if creds unset."""
+    creds = _webshare_creds()
+    if not creds:
+        return None
+    try:
+        from youtube_transcript_api.proxies import WebshareProxyConfig
+        return WebshareProxyConfig(proxy_username=creds[0], proxy_password=creds[1])
+    except Exception:
+        return None
+
+
+def _proxy_url() -> str | None:
+    """http(s) proxy URL for yt-dlp, or None if creds unset. Webshare rotating endpoint."""
+    creds = _webshare_creds()
+    if not creds:
+        return None
+    return f"http://{creds[0]}:{creds[1]}@p.webshare.io:80"
 
 
 def _extract_video_id(url: str) -> str | None:
@@ -35,7 +66,8 @@ def _fetch_via_api(video_id: str) -> tuple[str, None] | tuple[None, str]:
         VideoUnavailable,
     )
 
-    api = YouTubeTranscriptApi()
+    proxy_config = _webshare_proxy_config()
+    api = YouTubeTranscriptApi(proxy_config=proxy_config) if proxy_config else YouTubeTranscriptApi()
 
     def _entries_to_text(fetched) -> str:
         return " ".join(e["text"] for e in fetched.to_raw_data())
@@ -110,6 +142,9 @@ def _fetch_via_ytdlp(url: str) -> dict:
         "no_warnings": True,
         "extract_flat": False,
     }
+    proxy_url = _proxy_url()
+    if proxy_url:
+        ydl_opts["proxy"] = proxy_url
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)

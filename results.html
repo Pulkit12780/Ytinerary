@@ -1005,6 +1005,7 @@
     function buildDaySection(day, di, color, dim) {
       var section = el('div', 'day-section');
       section.id = 'day-section-' + di;
+      section.dataset.di = di;
 
       var header = el('div', 'day-section-header');
       header.setAttribute('role', 'button');
@@ -1621,6 +1622,16 @@
         }
       });
 
+      // Focus mode: when one day is selected, hide every *other* day entirely so the
+      // user sees only that day's plan. "More to Explore" / "Unresolved" are also
+      // tucked away to keep the focus clean; deactivateDayFilter() restores them all.
+      document.querySelectorAll('.day-section').forEach(function (s) {
+        s.style.display = parseInt(s.dataset.di) === di ? '' : 'none';
+      });
+      document.querySelectorAll('.more-section, .unresolved-section').forEach(function (s) {
+        s.style.display = 'none';
+      });
+
       document.querySelectorAll('.place-card').forEach(function (c) {
         c.style.opacity = parseInt(c.dataset.di) === di ? '' : '0.35';
       });
@@ -1658,6 +1669,9 @@
         h.classList.remove('active', 'dimmed');
         h.setAttribute('aria-pressed', 'false'); h.style.background = '';
       });
+      // Bring every section back into view.
+      document.querySelectorAll('.day-section, .more-section, .unresolved-section')
+        .forEach(function (s) { s.style.display = ''; });
       document.querySelectorAll('.place-card').forEach(function (c) { c.style.opacity = ''; });
       pinMarkers.forEach(function (pm) {
         var inner = pm.marker.getElement() ? pm.marker.getElement().querySelector('div') : null;

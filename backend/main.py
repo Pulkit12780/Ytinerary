@@ -157,6 +157,7 @@ async def health() -> dict:
         "openai_key_set": bool(os.getenv("OPENAI_API_KEY")),
         "opentripmap_key_set": bool(os.getenv("OPENTRIPMAP_API_KEY")),
         "youtube_key_set": bool(os.getenv("YOUTUBE_API_KEY")),
+        "transcript_proxy_set": bool(os.getenv("WEBSHARE_USER") and os.getenv("WEBSHARE_PASS")),
     }
 
 

@@ -1,6 +1,6 @@
 # Product Brief — Trip Intent & Auto-Sourcing
 
-**Author:** CPO · **Date:** 2026-06-14 · **Status:** Decision proposed, awaiting build
+**Author:** CPO · **Date:** 2026-06-14 · **Status:** Shipped (2026-06-14)
 
 ---
 

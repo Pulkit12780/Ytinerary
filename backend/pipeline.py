@@ -17,6 +17,7 @@ from .models import (
     Place,
     HotelPin,
     SourceVideo,
+    TRIP_TYPE_AUDIENCE,
 )
 from .agents import sourcer as sourcer_agent
 from .agents import transcript as transcript_agent
@@ -61,6 +62,7 @@ class PipelineState(TypedDict):
     plan: Optional[dict]            # {days: [...], more_to_explore: [...], warnings: [...]}
     hotel: Optional[dict]           # {name, lat, lng} | None
     sourced: bool                   # True if youtube_urls were auto-sourced (not manual)
+    warnings: list                  # soft, non-fatal notes surfaced to the user
     error: Optional[str]
     error_code: Optional[str]
 
@@ -118,6 +120,13 @@ def _hotel_hint(req: dict) -> str | None:
     return name if name and not name.startswith("http") else None
 
 
+def _audience(req: dict) -> str:
+    """Who the trip is for — explicit request value wins, else inferred from trip_type."""
+    return req.get("audience") or TRIP_TYPE_AUDIENCE.get(
+        req.get("trip_type") or "balanced", "general"
+    )
+
+
 def _to_place(p: dict) -> Place:
     return Place(
         name=p["name"],
@@ -132,6 +141,13 @@ def _to_place(p: dict) -> Place:
         meal_type=p.get("meal_type"),
         source=p.get("source", "video"),
         time_of_day=p.get("time_of_day"),
+        importance=p.get("importance"),
+        why=p.get("why"),
+        audience=p.get("audience") or [],
+        budget_tier=p.get("budget_tier"),
+        vibe=p.get("vibe") or [],
+        area=p.get("area"),
+        duration_hrs=p.get("duration_hrs"),
         source_videos=[
             SourceVideo(url=sv["url"], title=sv["title"])
             for sv in p.get("source_videos", [])
@@ -142,19 +158,44 @@ def _to_place(p: dict) -> Place:
 # ── Nodes ──────────────────────────────────────────────────────────────────
 
 
+# A plan reads as well-researched when it draws on several creators, not one. When the
+# user pastes only a link or two, top up with auto-sourced videos to reach this many.
+_MIN_VIDEOS = 5
+
+
 async def source_videos(state: PipelineState) -> dict:
     """Entry node (ADR-001): turn trip intent into `youtube_urls` to feed the pipeline.
 
-    - Manual precedence (AC #5): if the user pasted URLs, pass through untouched.
-    - Otherwise auto-source via the `VideoSource` seam and over-fetch (~8) so
+    - Manual URLs are kept and PRIORITIZED, but topped up with auto-sourced videos to
+      reach `_MIN_VIDEOS` so a thin paste (1-2 links) still yields a multi-source plan.
+    - With no URLs at all, auto-source via the `VideoSource` seam and over-fetch (~8) so
       `fetch_transcripts` can be the real filter (ADR-002).
-    - If nothing comes back, set NO_VIDEOS_FOUND so the UX nudges the paste fallback.
+    - Videos are optional: if nothing comes back, carry on with a soft note (the curator
+      is the backbone).
     """
     req = state["request"]
     queue = state.get("_queue")
 
-    if req.get("youtube_urls"):
-        return {}  # manual URLs win — skip auto-sourcing
+    manual = req.get("youtube_urls") or []
+    if manual and len(manual) >= _MIN_VIDEOS:
+        return {}  # already a rich set — use the user's links as-is
+
+    if manual:
+        # Top up a thin paste. Keep the user's links first (they win on ranking), then
+        # append auto-sourced ones that aren't dupes, up to _MIN_VIDEOS.
+        await _emit(queue, {
+            "type": "progress",
+            "step": 0,
+            "label": "Adding a few more travel videos to round out your plan...",
+        })
+        candidates = await _get_video_source().search(
+            req["destination"], req.get("trip_type", "balanced"), limit=8
+        )
+        extra = [c["url"] for c in candidates if c["url"] not in manual]
+        combined = (manual + extra)[:_MIN_VIDEOS]
+        if len(combined) > len(manual):
+            return {"request": {**req, "youtube_urls": combined}, "sourced": True}
+        return {}  # couldn't find extras — proceed with the user's links
 
     await _emit(queue, {
         "type": "progress",
@@ -167,11 +208,11 @@ async def source_videos(state: PipelineState) -> dict:
     )
 
     if not candidates:
-        return {
-            "error": "We couldn't find good videos for this trip — "
-                     "paste a YouTube link or two and we'll build from those.",
-            "error_code": "NO_VIDEOS_FOUND",
-        }
+        # Videos are optional now: the travel-expert curator is the backbone, so a
+        # video drought is a soft note, not a dead end. Carry on and build the plan
+        # from curated research alone.
+        return {"warnings": ["We built this from our own travel research — add a "
+                             "YouTube link or two to weave in creators you like."]}
 
     sourced_urls = [c["url"] for c in candidates]
     return {"request": {**req, "youtube_urls": sourced_urls}, "sourced": True}
@@ -180,21 +221,26 @@ async def source_videos(state: PipelineState) -> dict:
 async def fetch_transcripts(state: PipelineState) -> dict:
     req = state["request"]
     queue = state.get("_queue")
+    urls = req.get("youtube_urls") or []
+
+    # No videos to read (none pasted, none sourced) — the curator carries the plan.
+    if not urls:
+        return {"transcripts": []}
 
     await _emit(queue, {"type": "progress", "step": 1, "label": "Fetching video transcripts..."})
 
     results = await asyncio.gather(
-        *[transcript_agent.fetch_transcript(url) for url in req["youtube_urls"]]
+        *[transcript_agent.fetch_transcript(url) for url in urls]
     )
 
     valid = [r for r in results if r.get("transcript")]
     if not valid:
-        return {
-            "transcripts": list(results),
-            "error": "No transcripts found for the provided YouTube videos. "
-                     "The videos may have captions disabled.",
-            "error_code": "MISSING_TRANSCRIPT",
-        }
+        # Can't read the videos (captions off / IP-blocked) — degrade to a curated
+        # plan rather than failing. The user still gets an expert itinerary.
+        warn = ("We couldn't read those videos (captions unavailable), so this plan "
+                "comes from our own travel research." if not state.get("sourced") else
+                "Couldn't read the sourced videos — built this from our travel research.")
+        return {"transcripts": [], "warnings": [warn]}
 
     # Over-fetch filter (ADR-002, B5): when we auto-sourced ~8 candidates, keep only
     # the first few (ranked order) that actually yielded a transcript and drop the
@@ -237,21 +283,21 @@ async def extract_places(state: PipelineState) -> dict:
     for batch in nested:
         all_places.extend(batch)
 
-    # Drop clearly negative-sentiment places
-    positive_places = [p for p in all_places if p.get("sentiment") != "negative"]
+    # Drop clearly negative-sentiment places, and whole towns/regions — those are
+    # base locations, not single stops (this is what produced "an entire town as a
+    # day's plan"). Districts and POIs are kept.
+    kept = [
+        p for p in all_places
+        if p.get("sentiment") != "negative"
+        and (p.get("scope") or "poi") not in ("town", "region")
+    ]
 
     # Must-include places the user pasted as Google Maps links
-    positive_places.extend(_places_from_maps_links(req.get("maps_links")))
+    kept.extend(_places_from_maps_links(req.get("maps_links")))
 
-    if not positive_places:
-        return {
-            "raw_places": [],
-            "error": "No places could be extracted from the video transcripts. "
-                     "Try a travel-focused video with specific place names.",
-            "error_code": "ZERO_PLACES",
-        }
-
-    return {"raw_places": positive_places}
+    # Empty is fine now: the curator (augment_places) is the primary source and runs
+    # next. ZERO_PLACES is only raised if *nothing* survives after curation.
+    return {"raw_places": kept}
 
 
 async def augment_places(state: PipelineState) -> dict:
@@ -277,9 +323,22 @@ async def augment_places(state: PipelineState) -> dict:
         req.get("start_date"),
         req.get("trip_type", "balanced"),
         req.get("notes"),
+        req.get("budget", "any"),
+        _audience(req),
     )
 
     combined = list(raw) + aug.get("attractions", []) + aug.get("restaurants", [])
+
+    # Last line of defence: if neither the videos nor the curator yielded anything,
+    # there's genuinely no plan to build. (Curator failures degrade to empty lists.)
+    if not combined:
+        return {
+            "raw_places": [],
+            "error": "We couldn't find enough to plan this trip. Try a more specific "
+                     "destination, or paste a travel video to seed it.",
+            "error_code": "ZERO_PLACES",
+        }
+
     return {"raw_places": combined}
 
 
@@ -347,6 +406,7 @@ async def judge_and_plan(state: PipelineState) -> dict:
     plan = await judge_agent.plan_itinerary(
         enriched, hotel, _num_days(req), req["destination"],
         req.get("trip_type", "balanced"), req.get("notes"),
+        req.get("budget", "any"), _audience(req),
     )
     return {"plan": plan}
 
@@ -429,6 +489,13 @@ def _build_response(state: PipelineState) -> PlanResponse:
 
     more_to_explore = [_to_place(p) for p in plan.get("more_to_explore", [])]
 
+    # Soft pipeline notes (e.g. "couldn't read your videos") + the judge's feasibility
+    # warnings, de-duplicated in order.
+    warnings: list[str] = []
+    for w in list(state.get("warnings") or []) + list(plan.get("warnings", [])):
+        if w and w not in warnings:
+            warnings.append(w)
+
     hotel_data = state.get("hotel")
     hotel = HotelPin(**hotel_data) if hotel_data else None
 
@@ -448,7 +515,7 @@ def _build_response(state: PipelineState) -> PlanResponse:
         hotel=hotel,
         total_places=total,
         video_titles=video_titles,
-        warnings=plan.get("warnings", []),
+        warnings=warnings,
     )
 
 
@@ -467,6 +534,7 @@ async def run(
         "plan": None,
         "hotel": None,
         "sourced": False,
+        "warnings": [],
         "error": None,
         "error_code": None,
     }

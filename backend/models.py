@@ -23,6 +23,26 @@ TRIP_TYPE_SEARCH_MODIFIERS: dict[str, str] = {
     "culture": "heritage culture history",
 }
 
+# Who the plan is for — drives audience-fit weighting in the curator and judge.
+# Inferred from trip_type by default; the user can override via `audience`/notes.
+TRIP_TYPE_AUDIENCE: dict[str, str] = {
+    "balanced": "general",
+    "romantic": "couples",
+    "family": "families",
+    "adventure": "general",
+    "nature": "general",
+    "culture": "general",
+}
+
+# Spending tier — biases which places (and especially restaurants) we surface.
+# "any" = no budget signal (current behavior); inferred from notes when present.
+Budget = Literal["budget", "mid", "luxury", "any"]
+BUDGETS: tuple[Budget, ...] = ("budget", "mid", "luxury", "any")
+
+# How prominent a place is for a visitor — the must-see ↔ hidden-gem spectrum the
+# curator scores and the judge prioritizes on.
+Importance = Literal["must_see", "recommended", "hidden_gem", "optional"]
+
 NOTES_MAX_LEN = 500
 
 
@@ -30,6 +50,7 @@ class PlanRequest(BaseModel):
     destination: str
     trip_type: TripType = "balanced"   # default preserves current behavior
     notes: Optional[str] = None        # free text, capped at NOTES_MAX_LEN
+    budget: Budget = "any"             # spend tier — biases curated places/eats
     youtube_urls: list[str] = []       # optional — auto-sourced when empty
     hotel: Optional[str] = None
     start_date: Optional[str] = None  # ISO YYYY-MM-DD
@@ -83,6 +104,15 @@ class Place(BaseModel):
     meal_type: Optional[str] = None    # "breakfast" | "lunch" | "dinner" | None (attraction)
     source: str = "video"              # "video" | "suggested"
     time_of_day: Optional[str] = None  # "Morning" | "Afternoon" | "Evening" — display ordering
+    # Travel-expert signals (curator). All optional — older callers and the
+    # frontend ignore what they don't read, so this stays additive.
+    importance: Optional[str] = None   # "must_see" | "recommended" | "hidden_gem" | "optional"
+    why: Optional[str] = None          # one-line expert rationale ("worth it because…")
+    audience: list[str] = []           # who it suits: "couples" | "families" | "solo" | "groups"
+    budget_tier: Optional[str] = None  # "budget" | "mid" | "luxury"
+    vibe: list[str] = []               # "romantic" | "adventurous" | "cultural" | "relaxing" …
+    area: Optional[str] = None         # neighbourhood/sub-city — clusters days & multi-base legs
+    duration_hrs: Optional[float] = None  # typical time to spend, for realistic pacing
 
 
 class DayCluster(BaseModel):
