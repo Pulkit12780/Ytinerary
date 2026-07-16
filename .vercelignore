@@ -1,0 +1,12 @@
+backend/
+docs/
+design-system/
+.claude/
+.agents/
+.extract-design-system/
+.pytest_cache/
+PRD-Ytinerary.md
+travel-planner-spec.md
+skills-lock.json
+README.md
+Screenshot*.png

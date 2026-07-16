@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: ytinerary-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENTRIPMAP_API_KEY
+        sync: false
+      - key: OSRM_BASE_URL
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: WEBSHARE_USER
+        sync: false
+      - key: WEBSHARE_PASS
+        sync: false

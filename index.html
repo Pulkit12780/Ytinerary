@@ -1417,7 +1417,11 @@
       if (pipelineAbortCtrl) pipelineAbortCtrl.abort();
       pipelineAbortCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
 
-      var BACKEND = 'http://localhost:8000';
+      /* Local dev hits the uvicorn server directly; any other host (Vercel, etc.)
+         calls the deployed Render backend. Replace with your actual Render URL. */
+      var BACKEND = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+        ? 'http://localhost:8000'
+        : 'https://ytinerary-backend.onrender.com';
 
       fetch(BACKEND + '/plan/stream', {
         method:  'POST',
